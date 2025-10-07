@@ -4,7 +4,8 @@
 #include <Arduino.h>
 #include "radio.h"
 
-int radio_create(radio_struct_t **radio, uint8_t rx_pin, uint8_t tx_pin) {
+
+radio_struct_t *radio_create(uint8_t rx_pin, uint8_t tx_pin) {
     int i;
     radio_struct_t *radio_ptr;
 
@@ -31,8 +32,7 @@ int radio_create(radio_struct_t **radio, uint8_t rx_pin, uint8_t tx_pin) {
     pinMode(radio_ptr->tx_pin, OUTPUT);
     digitalWrite(radio_ptr->tx_pin, LOW);
 
-    *radio = radio_ptr;
-    return RADIO_SUCCESS;
+    return radio_ptr;
 }
 
 int radio_destroy(radio_struct_t *radio) {
@@ -156,8 +156,4 @@ int radio_play(radio_struct_t *radio) {
     }
 
     return 0;
-}
-
-void radio_interrupt_handler(radio_struct_t *radio) {
-    radio->time_counter++;
 }

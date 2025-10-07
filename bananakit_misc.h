@@ -17,6 +17,7 @@ typedef struct __bananakit_io__{
     char lcd_buf3[LCD_BUF_SIZE];
     uint8_t lcd_show_needed;
     unsigned long keypress;
+    void (*interrupt_callback)(void);
 } bananakit_io_t;
 
 

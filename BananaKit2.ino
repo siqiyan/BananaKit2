@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <util/atomic.h>
 
 #include "bananakit.h"
 #include "callstack.h"
@@ -68,7 +69,7 @@ void setup(void) {
     );
 #endif
 
-#ifdef EN_INT1
+#ifdef ENABLE_INT1
     // --------------------------------------------------------------------------
     // Setup timer1 interrupt:
     // Code generated from:
@@ -189,5 +190,9 @@ static void main_menu_flush(void) {
 
 // Timer1 interrupt handle:
 ISR(TIMER1_COMPA_vect) {
-    // radio_interrupt_handler(&Radio);
+    ATOMIC_BLOCK(ATOMIC_FORCEON) {
+        if(IO.interrupt_callback != NULL) {
+            IO.interrupt_callback();
+        }
+    }
 }

@@ -18,6 +18,7 @@ menu_t *Play_menu;
 radio_struct_t *Radio;
 
 
+void radio_module_interrupt(void);
 void radio_module_menu_refresh(void);
 node_status_t wait_and_return(void);
 void record_init(void);
@@ -61,7 +62,7 @@ void radio_module_init(void) {
     }
 
     // Initialize radio module:
-    radio_create(&Radio, RADIO_RX_PIN, RADIO_TX_PIN);
+    Radio = radio_create(RADIO_RX_PIN, RADIO_TX_PIN);
 
     // Create submenu for the radio module:
     Radio_menu = create_menu();
@@ -107,6 +108,8 @@ void radio_module_init(void) {
         );
         radio_module_menu_refresh();
     }
+
+    IO.interrupt_callback = radio_module_interrupt;
 
     Play_menu = NULL; // Play menu is not initialize so set to NULL
 }
@@ -156,6 +159,13 @@ void radio_module_exit(void) {
     Radio_menu = NULL;
     Play_menu = NULL;
     Radio = NULL;
+    IO.interrupt_callback = NULL;
+}
+
+void radio_module_interrupt(void) {
+    if(Radio != NULL) {
+        Radio->time_counter++;
+    }
 }
 
 void radio_module_menu_refresh(void) {
@@ -209,6 +219,7 @@ void record_init(void) {
     while(max_attempts > 0) {
 
         listen_retval = radio_listen(Radio);
+        // listen_retval = 0;
         if(listen_retval != 0) {
             // Error found, stop listen:
             break;
@@ -243,13 +254,13 @@ void record_init(void) {
     if((listen_retval == 0) && signal_found) {
 
         // No error and found signal:
-        bytes2hex_str(Radio->buf, LCD_BUF_SIZE, IO.lcd_buf1, HEX_BUF_SIZE);
+        bytes2hex_str(Radio->buf, LCD_BUF_SIZE, IO.lcd_buf0, HEX_BUF_SIZE);
 
     } else if((listen_retval == 0) && (!signal_found)) {
 
         // No error and no signal:
         snprintf(
-            IO.lcd_buf1,
+            IO.lcd_buf0,
             LCD_BUF_SIZE,
             "No signal"
         );
@@ -258,7 +269,7 @@ void record_init(void) {
 
         // Error in radio_listen():
         snprintf(
-            IO.lcd_buf1,
+            IO.lcd_buf0,
             LCD_BUF_SIZE,
             "listen fail:%d",
             listen_retval

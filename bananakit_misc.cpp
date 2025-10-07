@@ -12,6 +12,7 @@ int init_io(bananakit_io_t *io) {
     io->lcd_buf3[0] = '\0';
     io->lcd_show_needed = 0;
     io->keypress = 0xFFFFFF;
+    io->interrupt_callback = NULL;
     return BK_SUCCESS;
 }
 
