@@ -14,6 +14,10 @@
 //     #include <SD.h>
 // #endif
 
+#ifdef ENABLE_JOYSTICK_MODULE
+#include "joystick_module.h"
+#endif
+
 LiquidCrystal_I2C Lcd(LCD_ADDR, LCD_WIDTH, LCD_HEIGHT);
 IRrecv IR_recver(IR_SENSOR_PIN);
 decode_results IR_results;
@@ -65,6 +69,17 @@ void setup(void) {
         radio_module_update,
         radio_module_resume,
         radio_module_exit,
+        Main_menu
+    );
+#endif
+
+#ifdef ENABLE_JOYSTICK_MODULE
+    register_new_node(
+        "joystick",
+        joystick_init,
+        joystick_update,
+        joystick_resume,
+        joystick_exit,
         Main_menu
     );
 #endif

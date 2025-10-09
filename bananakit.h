@@ -47,13 +47,20 @@
 
 // MicroSD adapter module:
 #define MICROSD_CS_PIN 10
+
+// Joystick module:
+#define JOY_VRX             A2
+#define JOY_VRY             A3
+#define JOY_SW              3
+#define JOY_PUSH_BUTTON_0   6
+#define JOY_PUSH_BUTTON_1   5
 ///////////////////////////////////////////////////////////////
 
 // Module enablers:
 #define ENABLE_RADIO_MODULE
 // #define ENABLE_RC_STATION
 #define ENABLE_MICROSD_MODULE
-// #define ENABLE_JOYSTICK_MODULE
+#define ENABLE_JOYSTICK_MODULE
 // #define ENABLE_NRF24_MODULE
 
 // Interruption:
