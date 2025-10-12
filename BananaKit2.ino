@@ -18,6 +18,10 @@
 #include "joystick_module.h"
 #endif
 
+#ifdef ENABLE_RC_STATION
+#include "rc_station.h"
+#endif
+
 LiquidCrystal_I2C Lcd(LCD_ADDR, LCD_WIDTH, LCD_HEIGHT);
 IRrecv IR_recver(IR_SENSOR_PIN);
 decode_results IR_results;
@@ -80,6 +84,17 @@ void setup(void) {
         joystick_update,
         joystick_resume,
         joystick_exit,
+        Main_menu
+    );
+#endif
+
+#ifdef ENABLE_RC_STATION
+    register_new_node(
+        "rc station",
+        rc_station_init,
+        rc_station_update,
+        rc_station_resume,
+        rc_station_exit,
         Main_menu
     );
 #endif

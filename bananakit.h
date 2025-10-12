@@ -36,6 +36,9 @@
 #define PIC_7       0xFF42BD
 #define PIC_8       0xFF4AB5
 #define PIC_9       0xFF52AD
+
+// Built-in potentiometer:
+#define VOLT0_READ_PIN  A0
 ///////////////////////////////////////////////////////////////
 
 
@@ -54,14 +57,17 @@
 #define JOY_SW              3
 #define JOY_PUSH_BUTTON_0   6
 #define JOY_PUSH_BUTTON_1   5
+
+// nrf24 module:
+#define NRF24_CE_PIN        10
+#define NRF24_CSN_PIN       9
 ///////////////////////////////////////////////////////////////
 
 // Module enablers:
 #define ENABLE_RADIO_MODULE
 // #define ENABLE_RC_STATION
-#define ENABLE_MICROSD_MODULE
+// #define ENABLE_MICROSD_MODULE
 #define ENABLE_JOYSTICK_MODULE
-// #define ENABLE_NRF24_MODULE
 
 // Interruption:
 #define ENABLE_INT1

@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <CRC.h>
 
 #include "bananakit.h"
 #include "bananakit_misc.h"
@@ -155,4 +156,17 @@ int float2str(float value, char *buf, int sz, int precision) {
   *ptr++ = '\0'; // Put the termination mark at the end of buffer
 
   return ptr - buf;
+}
+
+// CRC8 checksum:
+uint8_t compute_checksum(char *frame, size_t framesize) {
+    CRC8 crc;
+    crc.restart();
+    crc.add((uint8_t *)frame, framesize - sizeof(uint8_t));
+
+    // for(size_t i = 0; i < framesize - sizeof(uint8_t); i++) {
+    //   crc.add(frame[i]);
+    // }
+    // frame->checksum = crc.calc();
+    return crc.calc();
 }

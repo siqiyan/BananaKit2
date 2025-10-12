@@ -40,5 +40,6 @@ int register_new_node(
 int register_new_unit(uint16_t new_unit_id, menu_t *menu);
 int bytes2hex_str(uint8_t *input, int input_len, char *output, int output_limit);
 int float2str(float value, char *buf, int sz, int precision);
+uint8_t compute_checksum(char *frame, size_t framesize);
 
 #endif
