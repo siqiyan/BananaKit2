@@ -11,9 +11,15 @@
 #define NRF24_ADDR_BASE "00001"
 #define NRF24_ADDR_VEHICLE "00002"
 #define FRAME_HEADER_ID 0xA0
+#define GPS_F2I_MULTI ((float) 1000000) // convert float to int for communication
 
 #define RC_SUCCESS      1
 #define RC_ERR_NUL_PTR  0
+
+typedef struct __command_toggle__ {
+    uint8_t estop:          1;
+    uint8_t navigate:       1;
+} command_toggle_t;
 
 // (Vehicle | Serial) Arduino-to-on-board computer dataframe:
 typedef struct __attribute__((__packed__)) __a2o_frame {
@@ -27,7 +33,7 @@ typedef struct __attribute__((__packed__)) __a2o_frame {
     int32_t goal_latitude_int;
     int32_t goal_longitude_int;
     int32_t goal_orientation_int;
-    uint8_t cmdkey;
+    command_toggle_t cmd_toggle;
     uint8_t checksum;
 } a2o_frame_t;
 
@@ -66,7 +72,7 @@ typedef struct __attribute__((__packed__)) __b2v_frame {
     int32_t goal_latitude_int;
     int32_t goal_longitude_int;
     int32_t goal_orientation_int;
-    uint8_t cmdkey;
+    command_toggle_t cmd_toggle;
 } b2v_frame_t;
 
 // (Base | Serial) Arduino-to-laptop dataframe:
@@ -93,7 +99,7 @@ typedef struct __attribute__((__packed__)) __l2a_frame {
     int32_t goal_latitude_int;
     int32_t goal_longitude_int;
     int32_t goal_orientation_int;
-    uint8_t cmdkey;
+    command_toggle_t cmd_toggle;
     uint8_t checksum;
 } l2a_frame_t;
 
@@ -102,20 +108,20 @@ typedef struct __rc_station__ {
     int64_t timestamp;
     int32_t sequence_id;
     int16_t frame_counter;
-    uint8_t cmd_toggle;
+    command_toggle_t cmd_toggle;
     int16_t twist_x, twist_y, twist_yaw;
     float goal_latitude, goal_longitude, goal_orientation;
     int32_t goal_latitude_int, goal_longitude_int, goal_orientation_int;
     int16_t adc_value;
-    float latitude, longitude, altitude, orientation;
-    int32_t latitude_int, longitude_int, orientation_int;
+    int32_t latitude_int, longitude_int, altitude_int, orientation_int;
     uint8_t sm_state;
     uint8_t toggle_ts_sync;
     int8_t sync_with_laptop;
     int8_t sync_with_vehicle;
     int joy_neutral_pos_x;
     int joy_neutral_pos_y;
-    float speed_multi;
+    float max_linear_speed;  // m/sec
+    float max_angular_speed; // rad/sec
 } rc_station_t;
 
 void rc_station_init(void);

@@ -55,39 +55,58 @@ node_status_t rc_station_update(void) {
     a2l_frame_t a2lframe;
     v2b_frame_t v2bframe;
     b2v_frame_t b2vframe;
+    float analog_value_f;
+    float speed_multi;
+    float scaled_linear_speed;
+    float scaled_angular_speed;
+    float latitude, longitude, altitude, orientation;
 
-    // Speed value:
-    Station->speed_multi = analogRead(VOLT0_READ_PIN) / 1024.0;
+    // Compute speed limit values:
+    speed_multi = ((float) analogRead(VOLT0_READ_PIN)) / 1024.0;
+    scaled_linear_speed = Station->max_linear_speed * speed_multi;
+    scaled_angular_speed = Station->max_angular_speed * speed_multi;
 
-    // Longitudinal twist command:
-    Station->twist_x = (analogRead(JOY_VRX) - Station->joy_neutral_pos_x) ;
+    // Compute longitudinal twist command:
+    // Longitudinal corresponds to joystick x-axis, positive value forward
+    analog_value_f = (float) (analogRead(JOY_VRX) - Station->joy_neutral_pos_x);
+    if(analog_value_f >= 0) {
+        Station->twist_x = analog_value_f / (1024 - Station->joy_neutral_pos_x) * scaled_linear_speed;
+    } else {
+        Station->twist_x = analog_value_f / Station->joy_neutral_pos_x * scaled_linear_speed;
+    }
 
-    // Rotation twist command:
-    Station->twist_yaw = analogRead(JOY_VRY) - Station->joy_neutral_pos_y;
+    // Compute rotation twist command:
+    analog_value_f = (float) (analogRead(JOY_VRY) - Station->joy_neutral_pos_y);
+    if(analog_value_f >= 0) {
+        Station->twist_yaw = analog_value_f / (1024 - Station->joy_neutral_pos_y) * scaled_angular_speed;
+    } else {
+        Station->twist_yaw = analog_value_f / Station->joy_neutral_pos_y * scaled_angular_speed;
+    }
 
+    //////////////////////////////////////////////////////////////////////////////////////////////
+    // Handle laptop side communication:
     if(Serial.available() > 0) {
+        // Receive l2a frame from base station's laptop:
         if(Serial.readBytes((char *) &l2aframe, sizeof(l2a_frame_t)) == sizeof(l2a_frame_t)) {
-            // Receive l2a frame from base station's laptop:
+
+            // Verify checksum:
             if(compute_checksum((char *) &l2aframe, sizeof(l2a_frame_t)) == l2aframe.checksum) {
-                // Verify checksum:
-                if(Station->toggle_ts_sync) {
-                    // Handle timestamp synchronization with laptop:
+
+                // Timestamp synchronization with laptop:
+                if(Station->toggle_ts_sync || (!Station->sync_with_laptop)) {
                     ATOMIC_BLOCK(ATOMIC_FORCEON) {
-                        Station->timestamp = l2aframe.timestamp;
-                        Station->toggle_ts_sync = 0;
+                        Station->timestamp = l2aframe.timestamp; 
                     }
+                    Station->toggle_ts_sync = 0;
                 }
 
                 if(abs(Station->timestamp - l2aframe.timestamp) < 1000) {
                     Station->sync_with_laptop = 1;
                     Station->sequence_id = l2aframe.sequence_id;
-                    Station->twist_x = l2aframe.twist_x;
-                    Station->twist_y = l2aframe.twist_y;
-                    Station->twist_yaw = l2aframe.twist_yaw;
                     Station->goal_latitude_int = l2aframe.goal_latitude_int;
                     Station->goal_longitude_int = l2aframe.goal_longitude_int;
                     Station->goal_orientation_int = l2aframe.goal_orientation_int;
-                    Station->cmd_toggle = l2aframe.cmdkey;
+                    Station->cmd_toggle = l2aframe.cmd_toggle;
                 } else {
                     // If incoming data is out-of-date:
                     Station->sync_with_laptop = 0;
@@ -112,8 +131,10 @@ node_status_t rc_station_update(void) {
         } // if(Serial.readBytes())
     } // if(Serial.available())
 
+    //////////////////////////////////////////////////////////////////////////////////////////////
+    // Handle vehicle side communication:
     if(RF_radio.available()) {
-        
+
         // Receive v2b frame from vehicle Arduino:
         RF_radio.read(&v2bframe, sizeof(v2b_frame_t));
 
@@ -122,6 +143,13 @@ node_status_t rc_station_update(void) {
             Station->latitude_int = v2bframe.latitude_int;
             Station->longitude_int = v2bframe.longitude_int;
             Station->orientation_int = v2bframe.orientation_int;
+
+            // Restore GPS coordinate from int to float:
+            latitude = Station->latitude_int / GPS_F2I_MULTI;
+            longitude = Station->longitude_int / GPS_F2I_MULTI;
+            altitude = Station->altitude_int / GPS_F2I_MULTI;
+            orientation = Station->orientation_int / GPS_F2I_MULTI;
+
             Station->sm_state = v2bframe.sm_state;
             Station->sync_with_vehicle = 1;
         } else {
@@ -133,7 +161,6 @@ node_status_t rc_station_update(void) {
     }
 
     // Update b2v frame with the latest data from base station's laptop:
-    
     b2vframe.timestamp = Station->timestamp;
     b2vframe.sequence_id = Station->sequence_id;
     b2vframe.twist_x = Station->twist_x;
@@ -142,14 +169,34 @@ node_status_t rc_station_update(void) {
     b2vframe.goal_latitude_int = Station->goal_latitude_int;
     b2vframe.goal_longitude_int = Station->goal_longitude_int;
     b2vframe.goal_orientation_int = Station->goal_orientation_int;
-    b2vframe.cmdkey = Station->cmd_toggle;
+    b2vframe.cmd_toggle = Station->cmd_toggle;
 
     // Send b2v frame to vehicle Arduino:
     RF_radio.stopListening();
     RF_radio.write(&b2vframe, sizeof(b2v_frame_t));
     RF_radio.startListening();
 
+    //////////////////////////////////////////////////////////////////////////////////////////////
+
     Station->frame_counter++;
+
+    // Refresh LCD display:
+    snprintf(
+        IO.lcd_buf0,
+        LCD_BUF_SIZE,
+        "Laptop:%d Vehicle:%d",
+        Station->sync_with_laptop,
+        Station->sync_with_vehicle
+    );
+    if(Station->sync_with_vehicle) {
+        snprintf(
+            IO.lcd_buf1,
+            LCD_BUF_SIZE,
+            "Batt:"
+        );
+    }
+    
+    IO.lcd_show_needed = 1;
 
     switch(IO.keypress) {
         case PIC_4:
@@ -204,7 +251,7 @@ void init_a2o_frame(a2o_frame_t *frame) {
     frame->goal_latitude_int = 0;
     frame->goal_longitude_int = 0;
     frame->goal_orientation_int = 0;
-    frame->cmdkey = 0;
+    frame->cmd_toggle = 0;
     frame->checksum = 0;
 }
 
@@ -240,7 +287,7 @@ void init_b2v_frame(b2v_frame_t *frame) {
     frame->goal_latitude_int = 0;
     frame->goal_longitude_int = 0;
     frame->goal_orientation_int = 0;
-    frame->cmdkey = 0;
+    frame->cmd_toggle = 0;
 }
 
 void init_a2l_frame(a2l_frame_t *frame) {
@@ -265,7 +312,7 @@ void init_l2a_frame(l2a_frame_t *frame) {
     frame->goal_latitude_int = 0;
     frame->goal_longitude_int = 0;
     frame->goal_orientation_int = 0;
-    frame->cmdkey = 0;
+    frame->cmd_toggle = 0;
     frame->checksum = 0;
 }
 
