@@ -19,6 +19,7 @@ void joystick_init(void) {
 node_status_t joystick_update(void) {
     int joy_axis_x;
     int joy_axis_y;
+    int volt0;
     uint8_t joy_sw;
     uint8_t joy_button_0;
     uint8_t joy_button_1;
@@ -29,6 +30,7 @@ node_status_t joystick_update(void) {
     joy_sw = digitalRead(JOY_SW);
     joy_button_0 = digitalRead(JOY_PUSH_BUTTON_0);
     joy_button_1 = digitalRead(JOY_PUSH_BUTTON_1);
+    volt0 = analogRead(VOLT0_READ_PIN);
 
     snprintf(
         IO.lcd_buf0,
@@ -40,8 +42,9 @@ node_status_t joystick_update(void) {
     snprintf(
         IO.lcd_buf1,
         LCD_BUF_SIZE,
-        "sw:%d",
-        joy_sw
+        "sw:%d v0:%d",
+        joy_sw,
+        volt0
     );
     snprintf(
         IO.lcd_buf2,
