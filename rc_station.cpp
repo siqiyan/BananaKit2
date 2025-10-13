@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdint.h>
+#include <Arduino.h>
 #include <util/atomic.h>
 
 #include "bananakit.h"
@@ -51,15 +52,20 @@ void rc_station_init(void) {
 
 node_status_t rc_station_update(void) {
     node_status_t next_state = NODE_RUNNING;
-    l2a_frame_t l2aframe;
-    a2l_frame_t a2lframe;
-    v2b_frame_t v2bframe;
-    b2v_frame_t b2vframe;
+    v2s_frame_t v2sframe;
+    s2v_frame_t s2vframe;
+    s2l_frame_t s2lframe;
+    l2s_frame_t l2sframe;
     float analog_value_f;
     float speed_multi;
     float scaled_linear_speed;
     float scaled_angular_speed;
     float latitude, longitude, altitude, orientation;
+
+    init_v2s_frame(&v2sframe);
+    init_s2v_frame(&s2vframe);
+    init_s2l_frame(&s2lframe);
+    init_l2s_frame(&l2sframe);
 
     // Compute speed limit values:
     speed_multi = ((float) analogRead(VOLT0_READ_PIN)) / 1024.0;
@@ -83,48 +89,60 @@ node_status_t rc_station_update(void) {
         Station->twist_yaw = analog_value_f / Station->joy_neutral_pos_y * scaled_angular_speed;
     }
 
+    // E-stop command:
+    Station->status_code.estop = 0; // estop off by default
+    if(digitalRead(JOY_PUSH_BUTTON_0) == LOW) {
+        delay(20); // de-noising
+        if(digitalRead(JOY_PUSH_BUTTON_0) == LOW) {
+            Station->status_code.estop = 1;
+        }
+    }
+
     //////////////////////////////////////////////////////////////////////////////////////////////
     // Handle laptop side communication:
     if(Serial.available() > 0) {
         // Receive l2a frame from base station's laptop:
-        if(Serial.readBytes((char *) &l2aframe, sizeof(l2a_frame_t)) == sizeof(l2a_frame_t)) {
+        if(Serial.readBytes((char *) &l2sframe, sizeof(l2s_frame_t)) == sizeof(l2s_frame_t)) {
 
             // Verify checksum:
-            if(compute_checksum((char *) &l2aframe, sizeof(l2a_frame_t)) == l2aframe.checksum) {
+            if(compute_checksum((char *) &l2sframe, sizeof(l2s_frame_t)) == l2sframe.checksum) {
 
                 // Timestamp synchronization with laptop:
-                if(Station->toggle_ts_sync || (!Station->sync_with_laptop)) {
+                if(Station->toggle_ts_sync || (!Station->status_code.sync_with_laptop)) {
                     ATOMIC_BLOCK(ATOMIC_FORCEON) {
-                        Station->timestamp = l2aframe.timestamp; 
+                        Station->timestamp = l2sframe.timestamp; 
                     }
                     Station->toggle_ts_sync = 0;
                 }
 
-                if(abs(Station->timestamp - l2aframe.timestamp) < 1000) {
-                    Station->sync_with_laptop = 1;
-                    Station->sequence_id = l2aframe.sequence_id;
-                    Station->goal_latitude_int = l2aframe.goal_latitude_int;
-                    Station->goal_longitude_int = l2aframe.goal_longitude_int;
-                    Station->goal_orientation_int = l2aframe.goal_orientation_int;
-                    Station->cmd_toggle = l2aframe.cmd_toggle;
+                if(abs(Station->timestamp - l2sframe.timestamp) < 1000) {
+                    Station->status_code.sync_with_laptop = 1;
+
+                    // Status code update (selective):
+                    Station->status_code.navigate = l2sframe.status_code.navigate;
+                    
+                    Station->goal_latitude_int = l2sframe.goal_latitude_int;
+                    Station->goal_longitude_int = l2sframe.goal_longitude_int;
+                    Station->goal_orientation_int = l2sframe.goal_orientation_int;
                 } else {
                     // If incoming data is out-of-date:
-                    Station->sync_with_laptop = 0;
+                    Station->status_code.sync_with_laptop = 0;
                 }
 
-                // Reply a2l frame to laptop:
-                a2lframe.timestamp = Station->timestamp;
-                a2lframe.sequence_id = Station->sequence_id;
-                a2lframe.adc_value = Station->adc_value;
-                a2lframe.latitude_int = Station->latitude_int;
-                a2lframe.longitude_int = Station->longitude_int;
-                a2lframe.orientation_int = Station->orientation_int;
-                a2lframe.sm_state = Station->sm_state;
+                // Reply s2l frame to laptop:
+                s2lframe.timestamp = Station->timestamp;
+                s2lframe.status_code = Station->status_code;
+                s2lframe.sequence_id = Station->frame_counter;
+                s2lframe.adc_value = Station->adc_value;
+                s2lframe.latitude_int = Station->latitude_int;
+                s2lframe.longitude_int = Station->longitude_int;
+                s2lframe.orientation_int = Station->orientation_int;
+                s2lframe.sm_state = Station->sm_state;
 
-                a2lframe.checksum = compute_checksum(
-                    (char *) &a2lframe, sizeof(a2l_frame_t)
+                s2lframe.checksum = compute_checksum(
+                    (char *) &s2lframe, sizeof(s2l_frame_t)
                 );
-                Serial.write((char *) &a2lframe, sizeof(a2l_frame_t));
+                Serial.write((char *) &s2lframe, sizeof(s2l_frame_t));
                 Serial.flush();
 
             } // if(compute_checksum())
@@ -136,13 +154,19 @@ node_status_t rc_station_update(void) {
     if(RF_radio.available()) {
 
         // Receive v2b frame from vehicle Arduino:
-        RF_radio.read(&v2bframe, sizeof(v2b_frame_t));
+        RF_radio.read(&v2sframe, sizeof(v2s_frame_t));
 
-        if(abs(Station->timestamp - v2bframe.timestamp) < 1000) {
-            Station->adc_value = v2bframe.adc_value;
-            Station->latitude_int = v2bframe.latitude_int;
-            Station->longitude_int = v2bframe.longitude_int;
-            Station->orientation_int = v2bframe.orientation_int;
+        if(abs(Station->timestamp - v2sframe.timestamp) < 1000) {
+            Station->status_code.sync_with_vehicle = 1;
+
+            // Update status code (selective):
+            Station->status_code.navigate_reply = v2sframe.status_code.navigate_reply;
+
+            Station->adc_value = v2sframe.adc_value;
+            Station->latitude_int = v2sframe.latitude_int;
+            Station->longitude_int = v2sframe.longitude_int;
+            Station->orientation_int = v2sframe.orientation_int;
+            Station->sm_state = v2sframe.sm_state;
 
             // Restore GPS coordinate from int to float:
             latitude = Station->latitude_int / GPS_F2I_MULTI;
@@ -150,30 +174,28 @@ node_status_t rc_station_update(void) {
             altitude = Station->altitude_int / GPS_F2I_MULTI;
             orientation = Station->orientation_int / GPS_F2I_MULTI;
 
-            Station->sm_state = v2bframe.sm_state;
-            Station->sync_with_vehicle = 1;
         } else {
             // If incoming data is out-of-date:
-            Station->sync_with_vehicle = 0;
+            Station->status_code.sync_with_vehicle = 0;
         }
     } else {
         delay(5);
     }
 
     // Update b2v frame with the latest data from base station's laptop:
-    b2vframe.timestamp = Station->timestamp;
-    b2vframe.sequence_id = Station->sequence_id;
-    b2vframe.twist_x = Station->twist_x;
-    b2vframe.twist_y = Station->twist_y;
-    b2vframe.twist_yaw = Station->twist_yaw;
-    b2vframe.goal_latitude_int = Station->goal_latitude_int;
-    b2vframe.goal_longitude_int = Station->goal_longitude_int;
-    b2vframe.goal_orientation_int = Station->goal_orientation_int;
-    b2vframe.cmd_toggle = Station->cmd_toggle;
+    s2vframe.timestamp = Station->timestamp;
+    s2vframe.status_code = Station->status_code;
+    s2vframe.sequence_id = Station->frame_counter;
+    s2vframe.twist_x = Station->twist_x;
+    s2vframe.twist_y = Station->twist_y;
+    s2vframe.twist_yaw = Station->twist_yaw;
+    s2vframe.goal_latitude_int = Station->goal_latitude_int;
+    s2vframe.goal_longitude_int = Station->goal_longitude_int;
+    s2vframe.goal_orientation_int = Station->goal_orientation_int;
 
     // Send b2v frame to vehicle Arduino:
     RF_radio.stopListening();
-    RF_radio.write(&b2vframe, sizeof(b2v_frame_t));
+    RF_radio.write(&s2vframe, sizeof(b2v_frame_t));
     RF_radio.startListening();
 
     //////////////////////////////////////////////////////////////////////////////////////////////
@@ -185,8 +207,8 @@ node_status_t rc_station_update(void) {
         IO.lcd_buf0,
         LCD_BUF_SIZE,
         "Laptop:%d Vehicle:%d",
-        Station->sync_with_laptop,
-        Station->sync_with_vehicle
+        Station->status_code.sync_with_laptop,
+        Station->status_code.sync_with_vehicle
     );
     if(Station->sync_with_vehicle) {
         snprintf(
@@ -227,7 +249,9 @@ void rc_station_resume(void) {
 void rc_station_exit(void) {
     destroy_rc_station(Station);
     Station = NULL;
-    // TODO: destroy nrf24 object
+
+    // TODO: turn off nrf24
+
     IO.interrupt_callback = NULL;
 }
 
@@ -240,34 +264,17 @@ void rc_station_interrupt(void) {
 
 ///////////////////////////////////////////////////////////////////
 // Local functions:
-void init_a2o_frame(a2o_frame_t *frame) {
-    frame->header = FRAME_HEADER_ID;
-    frame->timestamp = 0;
-    frame->sequence_id = 0;
-    frame->adc_value = 0;
-    frame->twist_x = 0;
-    frame->twist_y = 0;
-    frame->twist_yaw = 0;
-    frame->goal_latitude_int = 0;
-    frame->goal_longitude_int = 0;
-    frame->goal_orientation_int = 0;
-    frame->cmd_toggle = 0;
-    frame->checksum = 0;
+void init_status_code(status_code_t *code) {
+    code->estop = 0;
+    code->navigate = 0;
+    code->navigate_reply = 0;
+    code->sync_with_laptop = 0;
+    code->sync_with_vehicle = 0;
 }
 
-void init_o2a_frame(o2a_frame_t *frame) {
+void init_v2s_frame(v2s_frame_t *frame) {
     frame->header = FRAME_HEADER_ID;
-    frame->timestamp = 0;
-    frame->sequence_id = 0;
-    frame->latitude_int = 0;
-    frame->longitude_int = 0;
-    frame->orientation_int = 0;
-    frame->sm_state = 0;
-    frame->checksum = 0;
-}
-
-void init_v2b_frame(v2b_frame_t *frame) {
-    frame->header = FRAME_HEADER_ID;
+    init_status_code(&frame->status_code);
     frame->timestamp = 0;
     frame->sequence_id = 0;
     frame->latitude_int = 0;
@@ -277,8 +284,9 @@ void init_v2b_frame(v2b_frame_t *frame) {
     frame->sm_state = 0;
 }
 
-void init_b2v_frame(b2v_frame_t *frame) {
+void init_s2v_frame(s2v_frame_t *frame) {
     frame->header = FRAME_HEADER_ID;
+    init_status_code(&frame->status_code);
     frame->timestamp = 0;
     frame->sequence_id = 0;
     frame->twist_x = 0;
@@ -287,11 +295,11 @@ void init_b2v_frame(b2v_frame_t *frame) {
     frame->goal_latitude_int = 0;
     frame->goal_longitude_int = 0;
     frame->goal_orientation_int = 0;
-    frame->cmd_toggle = 0;
 }
 
-void init_a2l_frame(a2l_frame_t *frame) {
+void init_s2l_frame(s2l_frame_t *frame) {
     frame->header = FRAME_HEADER_ID;
+    init_status_code(&frame->status_code);
     frame->timestamp = 0;
     frame->sequence_id = 0;
     frame->adc_value = 0;
@@ -302,8 +310,9 @@ void init_a2l_frame(a2l_frame_t *frame) {
     frame->checksum = 0;
 }
 
-void init_l2a_frame(l2a_frame_t *frame) {
+void init_l2s_frame(l2s_frame_t *frame) {
     frame->header = FRAME_HEADER_ID;
+    init_status_code(&frame->status_code);
     frame->timestamp = 0;
     frame->sequence_id = 0;
     frame->twist_x = 0;
@@ -312,7 +321,6 @@ void init_l2a_frame(l2a_frame_t *frame) {
     frame->goal_latitude_int = 0;
     frame->goal_longitude_int = 0;
     frame->goal_orientation_int = 0;
-    frame->cmd_toggle = 0;
     frame->checksum = 0;
 }
 
@@ -324,8 +332,13 @@ rc_station_t *init_rc_station(void) {
     }
 
     // TODO: init station variables:
+    station->frame_counter = 0;
     station->joy_neutral_pos_x = 635;
     station->joy_neutral_pos_y = 646;
+    station->max_linear_speed = MAX_LINEAR_SPEED;
+    station->max_angular_speed = MAX_ANGULAR_SPEED;
+    station->sync_with_laptop = 0;
+    station->sync_with_vehicle = 0;
 
     return station;
 }
