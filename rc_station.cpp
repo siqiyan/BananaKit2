@@ -8,6 +8,7 @@
 #include "menu.h"
 #include "bananakit_misc.h"
 #include "rc_station.h"
+#include "rc_vehicle_common.h"
 
 
 extern callstack_t Callstack;
@@ -18,14 +19,9 @@ rc_station_t *Station;
 
 
 void rc_station_interrupt(void);
-void init_a2o_frame(a2o_frame_t *frame);
-void init_o2a_frame(o2a_frame_t *frame);
-void init_v2b_frame(v2b_frame_t *frame);
-void init_b2v_frame(b2v_frame_t *frame);
-void init_a2l_frame(a2l_frame_t *frame);
-void init_l2a_frame(l2a_frame_t *frame);
 rc_station_t *init_rc_station(void);
 int destroy_rc_station(rc_station_t *station);
+void refresh_lcd(void);
 
 
 void rc_station_init(void) {
@@ -120,7 +116,7 @@ node_status_t rc_station_update(void) {
 
                     // Status code update (selective):
                     Station->status_code.navigate = l2sframe.status_code.navigate;
-                    
+
                     Station->goal_latitude_int = l2sframe.goal_latitude_int;
                     Station->goal_longitude_int = l2sframe.goal_longitude_int;
                     Station->goal_orientation_int = l2sframe.goal_orientation_int;
@@ -169,10 +165,10 @@ node_status_t rc_station_update(void) {
             Station->sm_state = v2sframe.sm_state;
 
             // Restore GPS coordinate from int to float:
-            latitude = Station->latitude_int / GPS_F2I_MULTI;
-            longitude = Station->longitude_int / GPS_F2I_MULTI;
-            altitude = Station->altitude_int / GPS_F2I_MULTI;
-            orientation = Station->orientation_int / GPS_F2I_MULTI;
+            Station->latitude = Station->latitude_int / GPS_F2I_MULTI;
+            Station->longitude = Station->longitude_int / GPS_F2I_MULTI;
+            Station->altitude = Station->altitude_int / GPS_F2I_MULTI;
+            Station->orientation = Station->orientation_int / GPS_F2I_MULTI;
 
         } else {
             // If incoming data is out-of-date:
@@ -182,7 +178,7 @@ node_status_t rc_station_update(void) {
         delay(5);
     }
 
-    // Update b2v frame with the latest data from base station's laptop:
+    // Reply s2v frame to vehicle:
     s2vframe.timestamp = Station->timestamp;
     s2vframe.status_code = Station->status_code;
     s2vframe.sequence_id = Station->frame_counter;
@@ -192,33 +188,14 @@ node_status_t rc_station_update(void) {
     s2vframe.goal_latitude_int = Station->goal_latitude_int;
     s2vframe.goal_longitude_int = Station->goal_longitude_int;
     s2vframe.goal_orientation_int = Station->goal_orientation_int;
-
-    // Send b2v frame to vehicle Arduino:
     RF_radio.stopListening();
-    RF_radio.write(&s2vframe, sizeof(b2v_frame_t));
+    RF_radio.write(&s2vframe, sizeof(s2v_frame_t));
     RF_radio.startListening();
 
     //////////////////////////////////////////////////////////////////////////////////////////////
 
     Station->frame_counter++;
-
-    // Refresh LCD display:
-    snprintf(
-        IO.lcd_buf0,
-        LCD_BUF_SIZE,
-        "Laptop:%d Vehicle:%d",
-        Station->status_code.sync_with_laptop,
-        Station->status_code.sync_with_vehicle
-    );
-    if(Station->sync_with_vehicle) {
-        snprintf(
-            IO.lcd_buf1,
-            LCD_BUF_SIZE,
-            "Batt:"
-        );
-    }
-    
-    IO.lcd_show_needed = 1;
+    refresh_lcd();
 
     switch(IO.keypress) {
         case PIC_4:
@@ -264,64 +241,56 @@ void rc_station_interrupt(void) {
 
 ///////////////////////////////////////////////////////////////////
 // Local functions:
-void init_status_code(status_code_t *code) {
-    code->estop = 0;
-    code->navigate = 0;
-    code->navigate_reply = 0;
-    code->sync_with_laptop = 0;
-    code->sync_with_vehicle = 0;
-}
+void refresh_lcd(void) {
+    float batt_volt;
+    char floatbuf0[LCD_BUF_SIZE];
+    char floatbuf1[LCD_BUF_SIZE];
+    char floatbuf2[LCD_BUF_SIZE];
 
-void init_v2s_frame(v2s_frame_t *frame) {
-    frame->header = FRAME_HEADER_ID;
-    init_status_code(&frame->status_code);
-    frame->timestamp = 0;
-    frame->sequence_id = 0;
-    frame->latitude_int = 0;
-    frame->longitude_int = 0;
-    frame->orientation_int = 0;
-    frame->adc_value = 0;
-    frame->sm_state = 0;
-}
+    // Refresh LCD display:
+    snprintf(
+        IO.lcd_buf0,
+        LCD_BUF_SIZE,
+        "connect laptop:%d vehicle:%d",
+        Station->status_code.sync_with_laptop,
+        Station->status_code.sync_with_vehicle
+    );
+    if(Station->status_code.sync_with_vehicle) {
+        adc_volt = compute_batt_volt(Station->adc_value);
+        float2str(batt_volt, floatbuf0, LCD_BUF_SIZE, 2);
+        float2str(Station->latitude, floatbuf1, LCD_BUF_SIZE, 6);
+        float2str(Station->longitude, floatbuf2, LCD_BUF_SIZE, 6);
 
-void init_s2v_frame(s2v_frame_t *frame) {
-    frame->header = FRAME_HEADER_ID;
-    init_status_code(&frame->status_code);
-    frame->timestamp = 0;
-    frame->sequence_id = 0;
-    frame->twist_x = 0;
-    frame->twist_y = 0;
-    frame->twist_yaw = 0;
-    frame->goal_latitude_int = 0;
-    frame->goal_longitude_int = 0;
-    frame->goal_orientation_int = 0;
-}
+        snprintf(
+            IO.lcd_buf1,
+            LCD_BUF_SIZE,
+            "batt:%s sm:%d",
+            floatbuf0,
+            Station->sm_state
+        );
 
-void init_s2l_frame(s2l_frame_t *frame) {
-    frame->header = FRAME_HEADER_ID;
-    init_status_code(&frame->status_code);
-    frame->timestamp = 0;
-    frame->sequence_id = 0;
-    frame->adc_value = 0;
-    frame->latitude_int = 0;
-    frame->longitude_int = 0;
-    frame->orientation_int = 0;
-    frame->sm_state = 0;
-    frame->checksum = 0;
-}
+        snprintf(
+            IO.lcd_buf2,
+            LCD_BUF_SIZE,
+            "lat:%s",
+            floatbuf1
+        );
 
-void init_l2s_frame(l2s_frame_t *frame) {
-    frame->header = FRAME_HEADER_ID;
-    init_status_code(&frame->status_code);
-    frame->timestamp = 0;
-    frame->sequence_id = 0;
-    frame->twist_x = 0;
-    frame->twist_y = 0;
-    frame->twist_yaw = 0;
-    frame->goal_latitude_int = 0;
-    frame->goal_longitude_int = 0;
-    frame->goal_orientation_int = 0;
-    frame->checksum = 0;
+        snprintf(
+            IO.lcd_buf2,
+            LCD_BUF_SIZE,
+            "lon:%s",
+            floatbuf2
+        );
+    } else {
+        snprintf(
+            IO.lcd_buf1,
+            LCD_BUF_SIZE,
+            "batt:n/a sm:n/a"
+        );
+    }
+    
+    IO.lcd_show_needed = 1;
 }
 
 rc_station_t *init_rc_station(void) {
