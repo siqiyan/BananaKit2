@@ -251,12 +251,12 @@ void refresh_lcd(void) {
     snprintf(
         IO.lcd_buf0,
         LCD_BUF_SIZE,
-        "connect laptop:%d vehicle:%d",
+        "connect L:%d V:%d",
         Station->status_code.sync_with_laptop,
         Station->status_code.sync_with_vehicle
     );
     if(Station->status_code.sync_with_vehicle) {
-        adc_volt = compute_batt_volt(Station->adc_value);
+        batt_volt = compute_batt_volt(Station->adc_value);
         float2str(batt_volt, floatbuf0, LCD_BUF_SIZE, 2);
         float2str(Station->latitude, floatbuf1, LCD_BUF_SIZE, 6);
         float2str(Station->longitude, floatbuf2, LCD_BUF_SIZE, 6);
@@ -269,19 +269,19 @@ void refresh_lcd(void) {
             Station->sm_state
         );
 
-        snprintf(
-            IO.lcd_buf2,
-            LCD_BUF_SIZE,
-            "lat:%s",
-            floatbuf1
-        );
+        // snprintf(
+        //     IO.lcd_buf2,
+        //     LCD_BUF_SIZE,
+        //     "lat:%s",
+        //     floatbuf1
+        // );
 
-        snprintf(
-            IO.lcd_buf2,
-            LCD_BUF_SIZE,
-            "lon:%s",
-            floatbuf2
-        );
+        // snprintf(
+        //     IO.lcd_buf2,
+        //     LCD_BUF_SIZE,
+        //     "lon:%s",
+        //     floatbuf2
+        // );
     } else {
         snprintf(
             IO.lcd_buf1,
@@ -289,6 +289,16 @@ void refresh_lcd(void) {
             "batt:n/a sm:n/a"
         );
     }
+
+    float2str(Station->twist_x, floatbuf0, LCD_BUF_SIZE, 2);
+    float2str(Station->twist_yaw, floatbuf1, LCD_BUF_SIZE, 2);
+    snprintf(
+        IO.lcd_buf2,
+        LCD_BUF_SIZE,
+        "vx:%s vz:%s",
+        floatbuf0,
+        floatbuf1
+    );
     
     IO.lcd_show_needed = 1;
 }
@@ -306,8 +316,7 @@ rc_station_t *init_rc_station(void) {
     station->joy_neutral_pos_y = 646;
     station->max_linear_speed = MAX_LINEAR_SPEED;
     station->max_angular_speed = MAX_ANGULAR_SPEED;
-    station->sync_with_laptop = 0;
-    station->sync_with_vehicle = 0;
+    init_status_code(&station->status_code);
 
     return station;
 }

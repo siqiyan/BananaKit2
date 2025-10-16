@@ -7,6 +7,8 @@
 #include <RF24.h>
 #include <CRC.h>
 
+#include "rc_vehicle_common.h"
+
 #define UART_SPEED_BPS 115200
 
 #define RC_SUCCESS      1
