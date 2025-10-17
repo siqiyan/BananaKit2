@@ -53,7 +53,6 @@ node_status_t rc_station_update(void) {
     s2l_frame_t s2lframe;
     l2s_frame_t l2sframe;
     float analog_value_f;
-    float speed_multi;
     float scaled_linear_speed;
     float scaled_angular_speed;
     float latitude, longitude, altitude, orientation;
@@ -64,9 +63,9 @@ node_status_t rc_station_update(void) {
     init_l2s_frame(&l2sframe);
 
     // Compute speed limit values:
-    speed_multi = ((float) analogRead(VOLT0_READ_PIN)) / 1024.0;
-    scaled_linear_speed = Station->max_linear_speed * speed_multi;
-    scaled_angular_speed = Station->max_angular_speed * speed_multi;
+    Station->speed_multi = ((float) analogRead(VOLT0_READ_PIN)) / 1024.0;
+    scaled_linear_speed = Station->max_linear_speed * Station->speed_multi;
+    scaled_angular_speed = Station->max_angular_speed * Station->speed_multi;
 
     // Compute longitudinal twist command:
     // Longitudinal corresponds to joystick x-axis, positive value forward
@@ -164,12 +163,6 @@ node_status_t rc_station_update(void) {
             Station->orientation_int = v2sframe.orientation_int;
             Station->sm_state = v2sframe.sm_state;
 
-            // Restore GPS coordinate from int to float:
-            Station->latitude = Station->latitude_int / GPS_F2I_MULTI;
-            Station->longitude = Station->longitude_int / GPS_F2I_MULTI;
-            Station->altitude = Station->altitude_int / GPS_F2I_MULTI;
-            Station->orientation = Station->orientation_int / GPS_F2I_MULTI;
-
         } else {
             // If incoming data is out-of-date:
             Station->status_code.sync_with_vehicle = 0;
@@ -244,10 +237,9 @@ void rc_station_interrupt(void) {
 void refresh_lcd(void) {
     float batt_volt;
     char floatbuf0[LCD_BUF_SIZE];
-    char floatbuf1[LCD_BUF_SIZE];
-    char floatbuf2[LCD_BUF_SIZE];
+    // char floatbuf1[LCD_BUF_SIZE];
+    // char floatbuf2[LCD_BUF_SIZE];
 
-    // Refresh LCD display:
     snprintf(
         IO.lcd_buf0,
         LCD_BUF_SIZE,
@@ -255,12 +247,10 @@ void refresh_lcd(void) {
         Station->status_code.sync_with_laptop,
         Station->status_code.sync_with_vehicle
     );
+
     if(Station->status_code.sync_with_vehicle) {
         batt_volt = compute_batt_volt(Station->adc_value);
         float2str(batt_volt, floatbuf0, LCD_BUF_SIZE, 2);
-        float2str(Station->latitude, floatbuf1, LCD_BUF_SIZE, 6);
-        float2str(Station->longitude, floatbuf2, LCD_BUF_SIZE, 6);
-
         snprintf(
             IO.lcd_buf1,
             LCD_BUF_SIZE,
@@ -268,20 +258,6 @@ void refresh_lcd(void) {
             floatbuf0,
             Station->sm_state
         );
-
-        // snprintf(
-        //     IO.lcd_buf2,
-        //     LCD_BUF_SIZE,
-        //     "lat:%s",
-        //     floatbuf1
-        // );
-
-        // snprintf(
-        //     IO.lcd_buf2,
-        //     LCD_BUF_SIZE,
-        //     "lon:%s",
-        //     floatbuf2
-        // );
     } else {
         snprintf(
             IO.lcd_buf1,
@@ -290,14 +266,14 @@ void refresh_lcd(void) {
         );
     }
 
-    float2str(Station->twist_x, floatbuf0, LCD_BUF_SIZE, 2);
-    float2str(Station->twist_yaw, floatbuf1, LCD_BUF_SIZE, 2);
+    float2str(Station->speed_multi, floatbuf0, LCD_BUF_SIZE, 1);
     snprintf(
         IO.lcd_buf2,
         LCD_BUF_SIZE,
-        "vx:%s vz:%s",
+        "vx:%d vz:%d s:%s",
+        Station->twist_x,
+        Station->twist_yaw,
         floatbuf0,
-        floatbuf1
     );
     
     IO.lcd_show_needed = 1;
@@ -311,13 +287,25 @@ rc_station_t *init_rc_station(void) {
     }
 
     // TODO: init station variables:
+    station->timestamp = 0;
     station->frame_counter = 0;
+    init_status_code(&station->status_code);
+    station->twist_x = 0;
+    station->twist_y = 0;
+    station->goal_latitude_int = 0;
+    station->goal_longitude_int = 0;
+    station->goal_orientation_int = 0;
+    station->adc_value = 0;
+    station->latitude_int = 0;
+    station->longitude_int = 0;
+    station->altitude_int = 0;
+    station->sm_state = 0;
+    station->toggle_ts_sync = 0;
     station->joy_neutral_pos_x = 635;
     station->joy_neutral_pos_y = 646;
-    station->max_linear_speed = MAX_LINEAR_SPEED;
-    station->max_angular_speed = MAX_ANGULAR_SPEED;
-    init_status_code(&station->status_code);
-
+    station->max_linear_speed = MAX_LINEAR_SPEED_INT;
+    station->max_angular_speed = MAX_ANGULAR_SPEED_INT;
+    station->speed_multi = 0.0;
     return station;
 }
 

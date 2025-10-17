@@ -64,10 +64,10 @@
 ///////////////////////////////////////////////////////////////
 
 // Module enablers:
-#define ENABLE_RADIO_MODULE
-// #define ENABLE_RC_STATION
+// #define ENABLE_RADIO_MODULE
+#define ENABLE_RC_STATION
 // #define ENABLE_MICROSD_MODULE
-#define ENABLE_JOYSTICK_MODULE
+// #define ENABLE_JOYSTICK_MODULE
 
 // Interruption:
 #define ENABLE_INT1
