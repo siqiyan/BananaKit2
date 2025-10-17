@@ -20,7 +20,7 @@ typedef struct __rc_station__ {
     int64_t timestamp;
     int16_t frame_counter;
     status_code_t status_code;
-    int16_t twist_x, twist_y, twist_yaw;
+    float twist_x, twist_y, twist_yaw;
     int32_t goal_latitude_int, goal_longitude_int, goal_orientation_int;
     int16_t adc_value;
     int32_t latitude_int, longitude_int, altitude_int, orientation_int;
@@ -28,8 +28,6 @@ typedef struct __rc_station__ {
     uint8_t toggle_ts_sync;
     int joy_neutral_pos_x;
     int joy_neutral_pos_y;
-    int16_t max_linear_speed;  // m/sec
-    int16_t max_angular_speed; // rad/sec
     float speed_multi;
 } rc_station_t;
 

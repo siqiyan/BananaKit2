@@ -9,13 +9,13 @@
 #define NRF24_ADDR_BASE "00001"
 #define NRF24_ADDR_VEHICLE "00002"
 #define FRAME_HEADER_ID 0xA0
-#define GPS_F2I_MULTI ((float) 1000000) // convert float to int for communication
-#define CMD_VEL_MULTI ((float) 100) // convert float to int
-#define MAX_LINEAR_SPEED_INT 50 // m/s * CMD_VEL_MULTI
-#define MAX_ANGULAR_SPEED_INT 314 // rad/s * CMD_VEL_MULTI
-#define ADC_R1 30000.0 // for compute battery voltage
-#define ADC_R2 7500.0  // for compute battery voltage
-#define ADC_REF_VOLT 5.0
+#define GPS_F2I_MULTI ((float) 1000000) // convert GPS float to int for communication
+#define CMD_VEL_MULTI ((float) 100)     // convert cmd_vel float to int
+#define MAX_LINEAR_SPEED        0.5     // m/s
+#define MAX_ANGULAR_SPEED       3.14    // rad/s
+#define ADC_R1                  30000.0 // for compute battery voltage
+#define ADC_R2                  7500.0  // for compute battery voltage
+#define ADC_REF_VOLT            5.0
 
 typedef struct __status_code__ {
     uint8_t estop:              1;
