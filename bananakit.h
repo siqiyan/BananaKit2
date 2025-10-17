@@ -61,6 +61,10 @@
 // nrf24 module:
 #define NRF24_CE_PIN        10
 #define NRF24_CSN_PIN       9
+
+// Ublox GT-U7 GPS module:
+#define GT_U7_RX            5
+#define GP_U7_TX            6
 ///////////////////////////////////////////////////////////////
 
 // Module enablers:
@@ -68,6 +72,7 @@
 #define ENABLE_RC_STATION
 // #define ENABLE_MICROSD_MODULE
 // #define ENABLE_JOYSTICK_MODULE
+// #define ENABLE_GPS_IMU_MODULE
 
 // Interruption:
 #define ENABLE_INT1

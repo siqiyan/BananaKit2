@@ -22,6 +22,10 @@
 #include "rc_station.h"
 #endif
 
+#ifdef ENABLE_GPS_IMU_MODULE
+#include "gps_imu_module.h"
+#endif
+
 LiquidCrystal_I2C Lcd(LCD_ADDR, LCD_WIDTH, LCD_HEIGHT);
 IRrecv IR_recver(IR_SENSOR_PIN);
 decode_results IR_results;
@@ -95,6 +99,17 @@ void setup(void) {
         rc_station_update,
         rc_station_resume,
         rc_station_exit,
+        Main_menu
+    );
+#endif
+
+#ifdef ENABLE_GPS_IMU_MODULE
+    register_new_node(
+        "gps imu",
+        gps_imu_module_init,
+        gps_imu_module_update,
+        gps_imu_module_resume,
+        gps_imu_module_exit,
         Main_menu
     );
 #endif
