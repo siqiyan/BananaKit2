@@ -174,7 +174,7 @@ void loop(void) {
         IO.lcd_buf3[0] = '\0';
         IO.lcd_show_needed = 0;
     }
-    delay(50);
+    delay(500);
 }
 
 node_status_t main_menu_update(void) {
