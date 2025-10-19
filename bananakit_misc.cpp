@@ -158,6 +158,41 @@ int float2str(float value, char *buf, int sz, int precision) {
   return ptr - buf;
 }
 
+int field_extract(
+    const char *buf,
+    int bufsz,
+    char sep,
+    int field_index,
+    char *field,
+    int field_sz
+) {
+    int i, j;
+    int field_index_count;
+
+    if(buf == NULL || field == NULL || bufsz == 0 || field_sz == 0) {
+        return -1;
+    }
+
+    for(
+        i = 0, j = 0, field_index_count = 0;
+        i < bufsz, j < field_sz - 1, field_index_count <= field_index;
+        i++
+    ) {
+        if(field_index == field_index_count) {
+            field[j++] = buf[i];
+        }
+        if(buf[i] == sep) {
+            field_index_count++;
+        }
+    }
+
+    if(j > 0) {
+        field[j-1] = '\0'; // replace the last character with NUL
+    }
+
+    return j-1;
+}
+
 // CRC8 checksum:
 uint8_t compute_checksum(char *frame, size_t framesize) {
     CRC8 crc;

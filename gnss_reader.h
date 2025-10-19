@@ -3,6 +3,7 @@
 #include <stdint.h>
 
 #define GNSS_UART_BUF_SZ 40
+#define FIELD_BUF_SZ 16
 
 typedef enum {
     M_UNKNOWN,

@@ -100,6 +100,31 @@ static int parse_gprmc_string(gnss_reader_t *gnss) {
     // char speed[32];
     char dd[3], mo[3], yy[3];
     char degree[8], minute[8];
+
+    char field_buf[FIELD_BUF_SZ];
+
+    int field_extract(
+        const char *buf,
+        int bufsz,
+        char sep,
+        int field_index,
+        char *field,
+        int field_sz
+    );
+
+    // UTC time: 1
+    // TODO
+
+    // Status: 2
+    if(field_extract(gnss->buf, gnss->buf_count, ',', 2, field_buf, FIELD_BUF_SZ) >= 0) {
+        gnss->valid = (field_buf[0] == 'A');
+    }
+
+    // Latitude: 3 DDMM.MMMMMMM
+    if(field_extract(gnss->buf, gnss->buf_count, ',', 3, field_buf, FIELD_BUF_SZ) >= 0) {
+        // TODO
+    }
+
     for(int i = 1; i <= 13; i++) {
         p = strchr(p, ',');
         if(p == NULL) {
