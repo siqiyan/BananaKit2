@@ -9,7 +9,6 @@
 #define LCD_ADDR 0x27
 #define LCD_HEIGHT 4 // lcd screen height
 #define LCD_WIDTH 20 // lcd screen width
-#define LCD_BUF_SIZE (LCD_WIDTH + 1)
 
 // IR receiver:
 #include <IRremote.h>
