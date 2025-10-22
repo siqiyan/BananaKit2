@@ -6,6 +6,7 @@
 #include "bananakit.h"
 #include "callstack.h"
 #include "menu.h"
+#include "bananakit_io.h"
 #include "bananakit_misc.h"
 #include "rc_station.h"
 #include "rc_vehicle_common.h"
@@ -211,6 +212,8 @@ node_status_t rc_station_update(void) {
             break;
     }
 
+    delay(50);
+
     return next_state;
 }
 
@@ -241,21 +244,25 @@ void refresh_lcd(void) {
     char floatbuf1[LCD_BUF_SIZE];
     // char floatbuf2[LCD_BUF_SIZE];
 
+    IO.lcd_clear_callback();
+
     float2str(Station->speed_multi, floatbuf0, LCD_BUF_SIZE, 2);
     snprintf(
-        IO.lcd_buf0,
+        IO.lcd_buf,
         LCD_BUF_SIZE,
         "L:%d V:%d S:%s",
         Station->status_code.sync_with_laptop,
         Station->status_code.sync_with_vehicle,
         floatbuf0
     );
+    IO.flags = LCD_REFRESH_LINE0;
+    IO.lcd_refresh_callback();
 
     if(Station->status_code.sync_with_vehicle) {
         batt_volt = compute_batt_volt(Station->adc_value);
         float2str(batt_volt, floatbuf0, LCD_BUF_SIZE, 2);
         snprintf(
-            IO.lcd_buf1,
+            IO.lcd_buf,
             LCD_BUF_SIZE,
             "batt:%s sm:%d",
             floatbuf0,
@@ -263,24 +270,26 @@ void refresh_lcd(void) {
         );
     } else {
         snprintf(
-            IO.lcd_buf1,
+            IO.lcd_buf,
             LCD_BUF_SIZE,
             "batt:n/a sm:n/a"
         );
     }
+    IO.flags = LCD_REFRESH_LINE1;
+    IO.lcd_refresh_callback();
 
     float2str(Station->twist_x, floatbuf0, LCD_BUF_SIZE, 1);
     float2str(Station->twist_yaw, floatbuf1, LCD_BUF_SIZE, 1);
     
     snprintf(
-        IO.lcd_buf2,
+        IO.lcd_buf,
         LCD_BUF_SIZE,
         "vx:%s vz:%s",
         floatbuf0,
         floatbuf1
     );
-    
-    IO.lcd_show_needed = 1;
+    IO.flags = LCD_REFRESH_LINE2;
+    IO.lcd_refresh_callback();
 }
 
 rc_station_t *init_rc_station(void) {

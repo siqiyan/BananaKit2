@@ -1,21 +1,11 @@
 #include <stdint.h>
+#include <string.h>
 #include <CRC.h>
 
 #include "bananakit.h"
 #include "bananakit_misc.h"
 #include "callstack.h"
 #include "menu.h"
-
-int init_io(bananakit_io_t *io) {
-    io->lcd_buf0[0] = '\0';
-    io->lcd_buf1[0] = '\0';
-    io->lcd_buf2[0] = '\0';
-    io->lcd_buf3[0] = '\0';
-    io->lcd_show_needed = 0;
-    io->keypress = 0xFFFFFF;
-    io->interrupt_callback = NULL;
-    return BK_SUCCESS;
-}
 
 int register_new_node(
     const char *node_name,
@@ -186,11 +176,41 @@ int field_extract(
         }
     }
 
-    if(j > 0) {
-        field[j-1] = '\0'; // replace the last character with NUL
+    if(j >= 0) {
+        field[j] = '\0'; // replace the last character with NUL
     }
 
-    return j-1;
+    return j;
+}
+
+float gps_atof(const char *buf, int bufsz, uint8_t format) {
+    char degree[4], minute[11];
+
+    if(format == 0) {
+        // Format 0: DDMM.MMMMMMM
+
+        // strncpy(lat, p, strchr(p, ',') - p);
+        // strncpy(degree, lat, 2);
+        // strcpy(minute, lat+2);
+        // gnss->lat = atof(degree) + atof(minute) / 60.0;
+        degree[0] = buf[0];
+        degree[1] = buf[1];
+        degree[2] = '\0';
+        strncpy(minute, buf+2, 12);
+        return atof(degree) + atof(minute) / 60.0;
+    } else if(format == 1) {
+        // Format 1: DDDMM.MMMMMMM
+
+        // strncpy(lon, p, strchr(p, ',') - p);
+        // strncpy(degree, lon, 3);
+        // strcpy(minute, lon+3);
+        // gnss->lon = atof(degree) + atof(minute) / 60.0;
+        degree[0] = buf[0];
+        degree[1] = buf[1];
+        degree[2] = buf[2];
+        strncpy(minute, buf+3, 13);
+        return atof(degree) + atof(minute) / 60.0;
+    }
 }
 
 // CRC8 checksum:

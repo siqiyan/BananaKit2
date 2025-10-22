@@ -9,18 +9,6 @@
 
 #define HEX_BUF_SIZE 32
 
-// System IO interface data structures:
-typedef struct __bananakit_io__{
-    char lcd_buf0[LCD_BUF_SIZE];
-    char lcd_buf1[LCD_BUF_SIZE];
-    char lcd_buf2[LCD_BUF_SIZE];
-    char lcd_buf3[LCD_BUF_SIZE];
-    uint8_t lcd_show_needed;
-    unsigned long keypress;
-    void (*interrupt_callback)(void);
-} bananakit_io_t;
-
-
 // Return values for the API functions (signed integer):
 #define BK_SUCCESS          1
 #define BK_ERR_NUL_PTR      0
@@ -28,7 +16,6 @@ typedef struct __bananakit_io__{
 #define BK_ERR_EMPTY        -2
 #define BK_ERR_OTHER        -3
 
-int init_io(bananakit_io_t *io);
 int register_new_node(
     const char *node_name,
     void (*on_init)(void),
@@ -40,6 +27,15 @@ int register_new_node(
 int register_new_unit(uint16_t new_unit_id, menu_t *menu);
 int bytes2hex_str(uint8_t *input, int input_len, char *output, int output_limit);
 int float2str(float value, char *buf, int sz, int precision);
+int field_extract(
+    const char *buf,
+    int bufsz,
+    char sep,
+    int field_index,
+    char *field,
+    int field_sz
+);
+float gps_atof(const char *buf, int bufsz, uint8_t format);
 uint8_t compute_checksum(char *frame, size_t framesize);
 
 #endif

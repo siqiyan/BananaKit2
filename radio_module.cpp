@@ -5,6 +5,7 @@
 #include "bananakit.h"
 #include "callstack.h"
 #include "menu.h"
+#include "bananakit_io.h"
 #include "bananakit_misc.h"
 #include "radio_module.h"
 #include "radio.h"
@@ -46,18 +47,22 @@ void radio_module_init(void) {
     if(fs_status == THIN_ERR_FS_NOT_FOUND) {
         if(thin_create_fs() != THIN_SUCCESS) {
             snprintf(
-                IO.lcd_buf1,
+                IO.lcd_buf,
                 LCD_BUF_SIZE,
                 "FS create fail"
             );
+            IO.flags = LCD_REFRESH_LINE0;
+            IO.lcd_refresh_callback();
             return;
         }
     } else if(fs_status != THIN_SUCCESS) {
         snprintf(
-            IO.lcd_buf1,
+            IO.lcd_buf,
             LCD_BUF_SIZE,
             "FS init fail"
         );
+        IO.flags = LCD_REFRESH_LINE0;
+        IO.lcd_refresh_callback();
         return;
     }
 
@@ -68,11 +73,13 @@ void radio_module_init(void) {
     Radio_menu = create_menu();
     if(Radio_menu == NULL) {
         snprintf(
-            IO.lcd_buf1,
+            IO.lcd_buf,
             LCD_BUF_SIZE,
             "Radio menu init fail"
         );
-        IO.lcd_show_needed = 1;
+        IO.flags = LCD_REFRESH_LINE0;
+        IO.lcd_refresh_callback();
+
     } else {
         register_new_node(
             "record",
@@ -124,11 +131,13 @@ node_status_t radio_module_update(void) {
     switch(IO.keypress) {
         case PIC_2:
             menu_move_up(Radio_menu);
+            IO.lcd_clear_callback();
             radio_module_menu_refresh();
             break;
         
         case PIC_8:
             menu_move_down(Radio_menu);
+            IO.lcd_clear_callback();
             radio_module_menu_refresh();
             break;
 
@@ -145,6 +154,8 @@ node_status_t radio_module_update(void) {
         default:
             break;
     }
+
+    delay(50);
 
     return next_status;
 }
@@ -172,22 +183,24 @@ void radio_module_menu_refresh(void) {
     node_t *node;
 
     snprintf(
-        IO.lcd_buf0,
+        IO.lcd_buf,
         LCD_BUF_SIZE,
         "Radio Module"
     );
+    IO.flags = LCD_REFRESH_LINE0;
+    IO.lcd_refresh_callback();
 
     if(Radio_menu != NULL && (!menu_empty(Radio_menu))) {
         node = (node_t *) menu_get_select(Radio_menu);
         snprintf(
-            IO.lcd_buf1,
+            IO.lcd_buf,
             LCD_BUF_SIZE,
             "<%s>",
             node->name
         );
+        IO.flags = LCD_REFRESH_LINE1;
+        IO.lcd_refresh_callback();
     }
-
-    IO.lcd_show_needed = 1;
 }
 
 node_status_t wait_and_return(void) {
@@ -254,13 +267,13 @@ void record_init(void) {
     if((listen_retval == 0) && signal_found) {
 
         // No error and found signal:
-        bytes2hex_str(Radio->buf, LCD_BUF_SIZE, IO.lcd_buf0, HEX_BUF_SIZE);
+        bytes2hex_str(Radio->buf, LCD_BUF_SIZE, IO.lcd_buf, HEX_BUF_SIZE);
 
     } else if((listen_retval == 0) && (!signal_found)) {
 
         // No error and no signal:
         snprintf(
-            IO.lcd_buf0,
+            IO.lcd_buf,
             LCD_BUF_SIZE,
             "No signal"
         );
@@ -269,7 +282,7 @@ void record_init(void) {
 
         // Error in radio_listen():
         snprintf(
-            IO.lcd_buf0,
+            IO.lcd_buf,
             LCD_BUF_SIZE,
             "listen fail:%d",
             listen_retval
@@ -277,13 +290,16 @@ void record_init(void) {
 
     }
 
+    IO.flags = LCD_REFRESH_LINE0;
+    IO.lcd_refresh_callback();
+
     snprintf(
-        IO.lcd_buf1,
+        IO.lcd_buf,
         LCD_BUF_SIZE,
         "Save[4] Return[6]"
     );
-
-    IO.lcd_show_needed = 1;
+    IO.flags = LCD_REFRESH_LINE1;
+    IO.lcd_refresh_callback();
 }
 
 node_status_t record_update(void) {
@@ -354,8 +370,9 @@ node_status_t play_update(void) {
         case PIC_6:
             // Play the selected record:
             do_play_record();
-            snprintf(IO.lcd_buf1, LCD_BUF_SIZE, "Play complete");
-            IO.lcd_show_needed = 1;
+            snprintf(IO.lcd_buf, LCD_BUF_SIZE, "Play complete");
+            IO.flags = LCD_REFRESH_LINE1;
+            IO.lcd_refresh_callback();
             break;
 
         case PIC_USD:
@@ -393,47 +410,55 @@ void play_menu_refresh(void) {
     }
 
     snprintf(
-        IO.lcd_buf0,
+        IO.lcd_buf,
         LCD_BUF_SIZE,
         "Play[6] Delete[U]"
     );
+    IO.flags = LCD_REFRESH_LINE0;
+    IO.lcd_refresh_callback();
 
     unit_id = (uint16_t *) menu_get_select(Play_menu);
     snprintf(
-        IO.lcd_buf1,
+        IO.lcd_buf,
         LCD_BUF_SIZE,
         "record: %d",
         *unit_id
     );
+    IO.flags = LCD_REFRESH_LINE1;
+    IO.lcd_refresh_callback();
 
     // Load the selected record into the radio buffer:
     if(do_load_record(*unit_id, Radio)) {
         // Visualize the first few bytes of the radio buffer as hex code:
-        bytes2hex_str(Radio->buf, LCD_BUF_SIZE, IO.lcd_buf2, HEX_BUF_SIZE);
+        bytes2hex_str(Radio->buf, LCD_BUF_SIZE, IO.lcd_buf, HEX_BUF_SIZE);
     } else {
         snprintf(
-            IO.lcd_buf2,
+            IO.lcd_buf,
             LCD_BUF_SIZE,
             "Fail to load"
         );
     }
-    IO.lcd_show_needed = 1;
+    IO.flags = LCD_REFRESH_LINE2;
+    IO.lcd_refresh_callback();
 }
 
 //////////////////////////////////////////////////////
 // Delete node (sub-node of play node):
 void delete_init(void) {
     snprintf(
-        IO.lcd_buf1,
+        IO.lcd_buf,
         LCD_BUF_SIZE,
         "Confirm del?"
     );
+    IO.flags = LCD_REFRESH_LINE1;
+    IO.lcd_refresh_callback();
     snprintf(
-        IO.lcd_buf2,
+        IO.lcd_buf,
         LCD_BUF_SIZE,
         "Yes[4] No[6]"
     );
-    IO.lcd_show_needed = 1;
+    IO.flags = LCD_REFRESH_LINE2;
+    IO.lcd_refresh_callback();
 }
 
 node_status_t delete_update(void) {
@@ -464,13 +489,14 @@ node_status_t delete_update(void) {
 // Usage node functions:
 void usage_init(void) {
     snprintf(
-        IO.lcd_buf1,
+        IO.lcd_buf,
         LCD_BUF_SIZE,
         "M:%d/%d",
         thin_get_fs_usage(),
         EEPROM.length()
     );
-    IO.lcd_show_needed = 1;
+    IO.flags = LCD_REFRESH_LINE1;
+    IO.lcd_refresh_callback();
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -479,16 +505,19 @@ void usage_init(void) {
 // Format node functions:
 void format_init(void) {
     snprintf(
-        IO.lcd_buf1,
+        IO.lcd_buf,
         LCD_BUF_SIZE,
         "Confirm Format?"
     );
+    IO.flags = LCD_REFRESH_LINE1;
+    IO.lcd_refresh_callback();
     snprintf(
-        IO.lcd_buf2,
+        IO.lcd_buf,
         LCD_BUF_SIZE,
         "Yes[4] No[6]"
     );
-    IO.lcd_show_needed = 1;
+    IO.flags = LCD_REFRESH_LINE2;
+    IO.lcd_refresh_callback();
 }
 
 node_status_t format_update(void) {
@@ -498,11 +527,12 @@ node_status_t format_update(void) {
         case PIC_4:
             // Do formatting:
             if(thin_create_fs() == THIN_SUCCESS) {
-                snprintf(IO.lcd_buf1, LCD_BUF_SIZE, "FS formated");
+                snprintf(IO.lcd_buf, LCD_BUF_SIZE, "FS formated");
             } else {
-                snprintf(IO.lcd_buf1, LCD_BUF_SIZE, "FS format fail");
+                snprintf(IO.lcd_buf, LCD_BUF_SIZE, "FS format fail");
             }
-            IO.lcd_show_needed = 1;
+            IO.flags = LCD_REFRESH_LINE1;
+            IO.lcd_refresh_callback();
 
             // Return to previous node:
             next_status = NODE_EXITING;
@@ -549,12 +579,13 @@ static void do_save_record(void) {
 
     if(Radio->bit_count < 0 || Radio->bit_count > 64) {
         snprintf(
-            IO.lcd_buf1,
+            IO.lcd_buf,
             LCD_BUF_SIZE,
             "err bitcount:%d",
             Radio->bit_count
         );
-        IO.lcd_show_needed = 1;
+        IO.flags = LCD_REFRESH_LINE1;
+        IO.lcd_refresh_callback();
         return;
     }
 
@@ -569,10 +600,12 @@ static void do_save_record(void) {
 
                 // Failed due to fs full:
                 snprintf(
-                    IO.lcd_buf1,
+                    IO.lcd_buf,
                     LCD_BUF_SIZE,
                     "err fs full"
                 );
+                IO.flags = LCD_REFRESH_LINE1;
+                IO.lcd_refresh_callback();
 
             } else if(thin_retval == THIN_SUCCESS) {
 
@@ -583,10 +616,12 @@ static void do_save_record(void) {
 
                 // Failed for other reasons:
                 snprintf(
-                    IO.lcd_buf1,
+                    IO.lcd_buf,
                     LCD_BUF_SIZE,
                     "err fs"
                 );
+                IO.flags = LCD_REFRESH_LINE1;
+                IO.lcd_refresh_callback();
 
             }
 
@@ -595,7 +630,6 @@ static void do_save_record(void) {
     }
 
     if(!unit_available) {
-        IO.lcd_show_needed = 1;
         return;
     }
 
@@ -610,25 +644,28 @@ static void do_save_record(void) {
 
         // Save failed:
         snprintf(
-            IO.lcd_buf1,
+            IO.lcd_buf,
             LCD_BUF_SIZE,
             "err write"
         );
+        IO.flags = LCD_REFRESH_LINE1;
+        IO.lcd_refresh_callback();
 
     } else {
 
         // Save success:
         snprintf(
-            IO.lcd_buf1,
+            IO.lcd_buf,
             LCD_BUF_SIZE,
             "unit:%d saved",
             new_unit_id
         );
+        IO.flags = LCD_REFRESH_LINE1;
+        IO.lcd_refresh_callback();
 
     }
 
     thin_close(&new_unit);
-    IO.lcd_show_needed = 1;
 }
 
 static void do_play_record(void) {
@@ -655,19 +692,19 @@ static void do_delete_record(void) {
     if(thin_exist(*delete_unit_id) == THIN_SUCCESS) {
         thin_delete(*delete_unit_id);
         snprintf(
-            IO.lcd_buf1,
+            IO.lcd_buf,
             LCD_BUF_SIZE,
             "%d deleted",
             *delete_unit_id
         );
     } else {
         snprintf(
-            IO.lcd_buf1,
+            IO.lcd_buf,
             LCD_BUF_SIZE,
             "%d not exist",
             *delete_unit_id
         );
     }
-
-    IO.lcd_show_needed = 1;
+    IO.flags = LCD_REFRESH_LINE1;
+    IO.lcd_refresh_callback();
 }

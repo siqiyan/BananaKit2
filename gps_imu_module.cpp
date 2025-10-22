@@ -5,6 +5,7 @@
 #include "bananakit.h"
 #include "callstack.h"
 #include "menu.h"
+#include "bananakit_io.h"
 #include "bananakit_misc.h"
 #include "gps_imu_module.h"
 #include "gnss_reader.h"
@@ -36,12 +37,16 @@ node_status_t gps_imu_module_update(void) {
     char c;
     uint8_t nmea_start;
 
+    IO.lcd_clear_callback();
+
     if(GNSS == NULL) {
         snprintf(
-            IO.lcd_buf0,
+            IO.lcd_buf,
             LCD_BUF_SIZE,
             "GNSS init err"
         );
+        IO.flags = LCD_REFRESH_LINE0;
+        IO.lcd_refresh_callback();
         return NODE_EXITING;
     }
 
@@ -62,89 +67,183 @@ node_status_t gps_imu_module_update(void) {
         }
         GNSS->buf[GNSS->buf_count++] = c;
     }
-    GNSS->buf[GNSS->buf_count++] = '\0'; // set nul character
-    gnss_ret = parse_gnss_data_buf(GNSS);
+    GNSS->buf[GNSS->buf_count] = '\0'; // set nul character
 
-    if(gnss_ret == GNSS_SUCCESS) {
-        refresh_display();
-    } else {
-        switch(gnss_ret) {
-            case GNSS_ERR_GPRMC:
+    char field_buf[FIELD_BUF_SZ];
+    // char floatbuf[16];
+    int field_sz_ret;
+    if(GNSS->buf_count >= 6) {
+        if(strncmp(GNSS->buf, "$GPRMC", 6) == 0) {
+
+            // Latitude: 3 DDMM.MMMMMMM
+            if((field_sz_ret = field_extract(GNSS->buf, GNSS->buf_count, ',', 3, field_buf, FIELD_BUF_SZ)) == 12) {
                 snprintf(
-                    IO.lcd_buf0,
+                    IO.lcd_buf,
                     LCD_BUF_SIZE,
-                    "GNSS_ERR_GPRMC"
+                    "lat:%s",
+                    field_buf
                 );
-                break;
-
-            case GNSS_ERR_GPGGA:
+            } else {
                 snprintf(
-                    IO.lcd_buf0,
+                    IO.lcd_buf,
                     LCD_BUF_SIZE,
-                    "GNSS_ERR_GPGGA"
+                    "ret:%d",
+                    field_sz_ret
                 );
-                break;
+            }
+            IO.flags = LCD_REFRESH_LINE0;
+            IO.lcd_refresh_callback();
 
-            case GNSS_ERR_GPGLL:
+            // Longitude: 5 DDDMM.MMMMMMM
+            if((field_sz_ret = field_extract(GNSS->buf, GNSS->buf_count, ',', 5, field_buf, FIELD_BUF_SZ)) == 13) {
                 snprintf(
-                    IO.lcd_buf0,
+                    IO.lcd_buf,
                     LCD_BUF_SIZE,
-                    "GNSS_ERR_GPGLL"
+                    "lon:%s",
+                    field_buf
                 );
-                break;
-
-            case GNSS_ERR_GPGSV:
+            } else {
                 snprintf(
-                    IO.lcd_buf0,
+                    IO.lcd_buf,
                     LCD_BUF_SIZE,
-                    "GNSS_ERR_GPGSV"
+                    "ret:%d",
+                    field_sz_ret
                 );
-                break;
+            }
+            IO.flags = LCD_REFRESH_LINE1;
+            IO.lcd_refresh_callback();
 
-            case GNSS_ERR_GPVTG:
+        } else if(strncmp(GNSS->buf, "$GPGGA", 6) == 0) {
+
+            // Latitude: 3 DDMM.MMMMMMM
+            if((field_sz_ret = field_extract(GNSS->buf, GNSS->buf_count, ',', 2, field_buf, FIELD_BUF_SZ)) == 12) {
                 snprintf(
-                    IO.lcd_buf0,
+                    IO.lcd_buf,
                     LCD_BUF_SIZE,
-                    "GNSS_ERR_GPVTG"
+                    "lat:%s",
+                    field_buf
                 );
-                break;
-
-            case GNSS_ERR_GPGSA:
+            } else {
                 snprintf(
-                    IO.lcd_buf0,
+                    IO.lcd_buf,
                     LCD_BUF_SIZE,
-                    "GNSS_ERR_GPGSA"
+                    "ret:%d",
+                    field_sz_ret
                 );
-                break;
+            }
+            IO.flags = LCD_REFRESH_LINE0;
+            IO.lcd_refresh_callback();
 
-            case GNSS_ERR_UNKNOWN:
+            // Longitude: 4 DDDMM.MMMMMMM
+            if((field_sz_ret = field_extract(GNSS->buf, GNSS->buf_count, ',', 4, field_buf, FIELD_BUF_SZ)) == 13) {
                 snprintf(
-                    IO.lcd_buf0,
+                    IO.lcd_buf,
                     LCD_BUF_SIZE,
-                    "UNKNOWN"
+                    "lon:%s",
+                    field_buf
                 );
-                break;
-
-            case GNSS_ERR_EMPTY:
+            } else {
                 snprintf(
-                    IO.lcd_buf0,
+                    IO.lcd_buf,
                     LCD_BUF_SIZE,
-                    "EMPTY"
+                    "ret:%d",
+                    field_sz_ret
                 );
-                break;
-
-            default:
-                break;
+            }
+            IO.flags = LCD_REFRESH_LINE1;
+            IO.lcd_refresh_callback();
         }
-
-        snprintf(
-            IO.lcd_buf1,
-            LCD_BUF_SIZE,
-            "%s",
-            GNSS->buf
-        );
-        IO.lcd_show_needed = 1;
+        
+    } else {
+        snprintf(IO.lcd_buf, LCD_BUF_SIZE, "buf_count:%d", GNSS->buf_count);
+        IO.flags = LCD_REFRESH_LINE0;
+        IO.lcd_refresh_callback();
     }
+
+    // gnss_ret = parse_gnss_data_buf(GNSS);
+    // if(gnss_ret == GNSS_SUCCESS) {
+    //     refresh_display();
+    // }
+
+
+    // else {
+    //     switch(gnss_ret) {
+    //         case GNSS_ERR_GPRMC:
+    //             snprintf(
+    //                 IO.lcd_buf0,
+    //                 LCD_BUF_SIZE,
+    //                 "GNSS_ERR_GPRMC"
+    //             );
+    //             break;
+
+    //         case GNSS_ERR_GPGGA:
+    //             snprintf(
+    //                 IO.lcd_buf0,
+    //                 LCD_BUF_SIZE,
+    //                 "GNSS_ERR_GPGGA"
+    //             );
+    //             break;
+
+    //         // case GNSS_ERR_GPGLL:
+    //         //     snprintf(
+    //         //         IO.lcd_buf0,
+    //         //         LCD_BUF_SIZE,
+    //         //         "GNSS_ERR_GPGLL"
+    //         //     );
+    //         //     break;
+
+    //         // case GNSS_ERR_GPGSV:
+    //         //     snprintf(
+    //         //         IO.lcd_buf0,
+    //         //         LCD_BUF_SIZE,
+    //         //         "GNSS_ERR_GPGSV"
+    //         //     );
+    //         //     break;
+
+    //         // case GNSS_ERR_GPVTG:
+    //         //     snprintf(
+    //         //         IO.lcd_buf0,
+    //         //         LCD_BUF_SIZE,
+    //         //         "GNSS_ERR_GPVTG"
+    //         //     );
+    //         //     break;
+
+    //         // case GNSS_ERR_GPGSA:
+    //         //     snprintf(
+    //         //         IO.lcd_buf0,
+    //         //         LCD_BUF_SIZE,
+    //         //         "GNSS_ERR_GPGSA"
+    //         //     );
+    //         //     break;
+
+    //         // case GNSS_ERR_UNKNOWN:
+    //         //     snprintf(
+    //         //         IO.lcd_buf0,
+    //         //         LCD_BUF_SIZE,
+    //         //         "UNKNOWN"
+    //         //     );
+    //         //     break;
+
+    //         case GNSS_ERR_EMPTY:
+    //             snprintf(
+    //                 IO.lcd_buf0,
+    //                 LCD_BUF_SIZE,
+    //                 "EMPTY"
+    //             );
+    //             break;
+
+    //         default:
+    //             break;
+    //     }
+
+    //     snprintf(
+    //         IO.lcd_buf1,
+    //         LCD_BUF_SIZE,
+    //         "%s",
+    //         GNSS->buf
+    //     );
+    //     IO.lcd_show_needed = 1;
+    // }
 
     GNSS->buf[0] = '\0'; // clear buf after use
 
@@ -156,6 +255,8 @@ node_status_t gps_imu_module_update(void) {
         default:
             break;
     }
+
+    delay(500);
 
     return next_status;
 }
@@ -180,19 +281,23 @@ static void refresh_display(void) {
 
     float2str(GNSS->lat, floatbuf0, LCD_BUF_SIZE, 8);
     snprintf(
-        IO.lcd_buf0,
+        IO.lcd_buf,
         LCD_BUF_SIZE,
         "lat:%s",
         floatbuf0
     );
+    IO.flags = LCD_REFRESH_LINE0;
+    IO.lcd_refresh_callback();
 
     float2str(GNSS->lon, floatbuf0, LCD_BUF_SIZE, 8);
     snprintf(
-        IO.lcd_buf1,
+        IO.lcd_buf,
         LCD_BUF_SIZE,
         "lon:%s",
         floatbuf0
     );
+    IO.flags = LCD_REFRESH_LINE1;
+    IO.lcd_refresh_callback();
 
     switch(GNSS->mode) {
         case M_UNKNOWN:
@@ -214,12 +319,12 @@ static void refresh_display(void) {
 
     float2str(GNSS->alt, floatbuf0, LCD_BUF_SIZE, 1);
     snprintf(
-        IO.lcd_buf2,
+        IO.lcd_buf,
         LCD_BUF_SIZE,
         "mode:%c alt:%s",
         mode,
         floatbuf0
     );
-
-    IO.lcd_show_needed = 1;
+    IO.flags = LCD_REFRESH_LINE2;
+    IO.lcd_refresh_callback();
 }

@@ -5,6 +5,7 @@
 #include "bananakit.h"
 #include "callstack.h"
 #include "menu.h"
+#include "bananakit_io.h"
 #include "bananakit_misc.h"
 
 extern callstack_t Callstack;
@@ -32,29 +33,37 @@ node_status_t joystick_update(void) {
     joy_button_1 = digitalRead(JOY_PUSH_BUTTON_1);
     volt0 = analogRead(VOLT0_READ_PIN);
 
+    IO.lcd_clear_callback();
+
     snprintf(
-        IO.lcd_buf0,
+        IO.lcd_buf,
         LCD_BUF_SIZE,
         "x:%d y:%d",
         joy_axis_x,
         joy_axis_y
     );
+    IO.flags = LCD_REFRESH_LINE0;
+    IO.lcd_refresh_callback();
+
     snprintf(
-        IO.lcd_buf1,
+        IO.lcd_buf,
         LCD_BUF_SIZE,
         "sw:%d v0:%d",
         joy_sw,
         volt0
     );
+    IO.flags = LCD_REFRESH_LINE1;
+    IO.lcd_refresh_callback();
+
     snprintf(
-        IO.lcd_buf2,
+        IO.lcd_buf,
         LCD_BUF_SIZE,
         "b0:%d b1:%d",
         joy_button_0,
         joy_button_1
     );
-
-    IO.lcd_show_needed = 1;
+    IO.flags = LCD_REFRESH_LINE2;
+    IO.lcd_refresh_callback();
 
     switch(IO.keypress) {
         case PIC_4:
@@ -65,6 +74,8 @@ node_status_t joystick_update(void) {
         default:
             break;
     }
+
+    delay(50);
 
     return next_status;
 }

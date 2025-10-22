@@ -5,6 +5,7 @@
 #include "callstack.h"
 #include "menu.h"
 #include "bananakit_misc.h"
+#include "bananakit_io.h"
 
 #ifdef ENABLE_RADIO_MODULE
     #include "radio_module.h"
@@ -44,7 +45,7 @@ void setup(void) {
     IR_recver.enableIRIn();
     Lcd.init();
     Lcd.backlight();
-    init_io(&IO);
+    init_io(&IO, lcd_refresh, lcd_clear);
 
     // Initialize the main node with callstack:
     init_callstack(&Callstack);
@@ -148,33 +149,6 @@ void loop(void) {
     }
 
     callstack_update(&Callstack);
-
-    if(IO.lcd_show_needed) {
-        Lcd.clear();
-        Lcd.setCursor(0, 0);
-        Lcd.print(IO.lcd_buf0);
-        Lcd.setCursor(0, 1);
-        Lcd.print(IO.lcd_buf1);
-        Lcd.setCursor(0, 2);
-        Lcd.print(IO.lcd_buf2);
-
-        // The last row is reserved for the system:
-        // get_callstack_path(&Callstack, current_path, LCD_BUF_SIZE);
-        // snprintf(
-        //     IO.lcd_buf3,
-        //     LCD_BUF_SIZE,
-        //     current_path
-        // );
-        // Lcd.setCursor(0, 3);
-        // Lcd.print(IO.lcd_buf3);
-
-        IO.lcd_buf0[0] = '\0';
-        IO.lcd_buf1[0] = '\0';
-        IO.lcd_buf2[0] = '\0';
-        IO.lcd_buf3[0] = '\0';
-        IO.lcd_show_needed = 0;
-    }
-    delay(500);
 }
 
 node_status_t main_menu_update(void) {
@@ -184,13 +158,11 @@ node_status_t main_menu_update(void) {
     switch(IO.keypress) {
         case PIC_2:
             menu_move_up(Main_menu);
-            IO.lcd_show_needed = 1;
             main_menu_flush();
             break;
 
         case PIC_8:
             menu_move_down(Main_menu);
-            IO.lcd_show_needed = 1;
             main_menu_flush();
             break;
 
@@ -211,26 +183,67 @@ void main_menu_resume(void) {
     main_menu_flush();
 }
 
+void lcd_refresh(void) {
+    switch(IO.flags) {
+        case LCD_REFRESH_LINE0:
+            Lcd.setCursor(0, 0);
+            Lcd.print(IO.lcd_buf);
+            IO.lcd_buf[0] = '\0';
+            IO.flags = LCD_NO_REFRESH;
+            break;
+
+        case LCD_REFRESH_LINE1:
+            Lcd.setCursor(0, 1);
+            Lcd.print(IO.lcd_buf);
+            IO.lcd_buf[0] = '\0';
+            IO.flags = LCD_NO_REFRESH;
+            break;
+
+        case LCD_REFRESH_LINE2:
+            Lcd.setCursor(0, 2);
+            Lcd.print(IO.lcd_buf);
+            IO.lcd_buf[0] = '\0';
+            IO.flags = LCD_NO_REFRESH;
+            break;
+
+        case LCD_REFRESH_LINE3:
+            Lcd.setCursor(0, 3);
+            Lcd.print(IO.lcd_buf);
+            IO.lcd_buf[0] = '\0';
+            IO.flags = LCD_NO_REFRESH;
+            break;
+
+        default:
+            break;
+    }
+}
+
+void lcd_clear(void) {
+    Lcd.clear();
+}
+
 static void main_menu_flush(void) {
     node_t *node;
 
     snprintf(
-        IO.lcd_buf0,
+        IO.lcd_buf,
         LCD_BUF_SIZE,
         "Main Menu"
     );
+    IO.flags = LCD_REFRESH_LINE0;
+    IO.lcd_refresh_callback();
 
     if(Main_menu != NULL && (!menu_empty(Main_menu))) {
         node = menu_get_select(Main_menu);
         snprintf(
-            IO.lcd_buf1,
+            IO.lcd_buf,
             LCD_BUF_SIZE,
             "<%s>",
             node->name
         );
+        IO.flags = LCD_REFRESH_LINE1;
+        IO.lcd_refresh_callback();
     }
-    
-    IO.lcd_show_needed = 1;
 }
 
 // Timer1 interrupt handle:
