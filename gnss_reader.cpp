@@ -1,6 +1,7 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include "bananakit_misc.h"
 #include "gnss_reader.h"
 
 
@@ -59,283 +60,198 @@ int parse_gnss_data_buf(gnss_reader_t *gnss) {
             return GNSS_ERR_GPRMC;
         }
 
-    } else if(strncmp(gnss->buf, "$GPVTG", 6) == 0) {
-
-        // TODO
-        return GNSS_ERR_GPVTG;
-
-    } else if(strncmp(gnss->buf, "$GPGLL", 6) == 0) {
-
-        // TODO
-        return GNSS_ERR_GPGLL;
-
-    } else if(strncmp(gnss->buf, "$GPGSV", 6) == 0) {
-
-        // TODO
-        return GNSS_ERR_GPGSV;
-
     } else if(strncmp(gnss->buf, "$GPGGA", 6) == 0) {
 
         if(parse_gpgga_string(gnss) == 0) {
             return GNSS_SUCCESS;
         } else {
-            return GNSS_ERR_GPRMC;
+            return GNSS_ERR_GPGGA;
         }
 
-    } else if(strncmp(gnss->buf, "$GPGSA", 6) == 0) {
-
-        // TODO
-        return GNSS_ERR_GPGSA;
-
     }
+    
+    // else if(strncmp(gnss->buf, "$GPVTG", 6) == 0) {
+
+    //     // TODO
+    //     return GNSS_ERR_GPVTG;
+
+    // } else if(strncmp(gnss->buf, "$GPGLL", 6) == 0) {
+
+    //     // TODO
+    //     return GNSS_ERR_GPGLL;
+
+    // } else if(strncmp(gnss->buf, "$GPGSV", 6) == 0) {
+
+    //     // TODO
+    //     return GNSS_ERR_GPGSV;
+
+    // }  else if(strncmp(gnss->buf, "$GPGSA", 6) == 0) {
+
+    //     // TODO
+    //     return GNSS_ERR_GPGSA;
+
+    // }
 
     return GNSS_ERR_UNKNOWN;
 }
 
 static int parse_gprmc_string(gnss_reader_t *gnss) {
-    const char *p = gnss->buf;
-    char hh[3], mm[3], ss[6];
-    char lat[8];
-    char lon[8];
-    // char speed[32];
-    char dd[3], mo[3], yy[3];
-    char degree[8], minute[8];
-
     char field_buf[FIELD_BUF_SZ];
-
-    int field_extract(
-        const char *buf,
-        int bufsz,
-        char sep,
-        int field_index,
-        char *field,
-        int field_sz
-    );
+    char floatbuf[16];
+    int field_sz_ret;
 
     // UTC time: 1
     // TODO
+    // strncpy(hh, p, 2);
+    // strncpy(mm, p+2, 2);
+    // strncpy(ss, p+4, 5);
+    // gnss->utc_hour = atoi(hh);
+    // gnss->utc_min = atoi(mm);
+    // gnss->utc_sec  = atof(ss);
 
     // Status: 2
-    if(field_extract(gnss->buf, gnss->buf_count, ',', 2, field_buf, FIELD_BUF_SZ) >= 0) {
+    if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 2, field_buf, FIELD_BUF_SZ)) > 0) {
         gnss->valid = (field_buf[0] == 'A');
     }
 
     // Latitude: 3 DDMM.MMMMMMM
-    if(field_extract(gnss->buf, gnss->buf_count, ',', 3, field_buf, FIELD_BUF_SZ) >= 0) {
-        // TODO
+    if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 3, field_buf, FIELD_BUF_SZ)) == 12) {
+        // gnss->lat = gps_atof(field_buf, field_sz_ret, 0);
     }
 
-    for(int i = 1; i <= 13; i++) {
-        p = strchr(p, ',');
-        if(p == NULL) {
-            return -1;
-        }
-        p++; // point to the start of new colume
-        switch(i) {
-            case 0:
-                // Sentence ID
-                break;
-
-            case 1:
-                // UTC time
-                strncpy(hh, p, 2);
-                strncpy(mm, p+2, 2);
-                strncpy(ss, p+4, 5);
-                gnss->utc_hour = atoi(hh);
-                gnss->utc_min = atoi(mm);
-                gnss->utc_sec  = atof(ss);
-                break;
-
-            case 2:
-                // Status
-                gnss->valid = (*p == 'A');
-                break;
-
-            case 3:
-                // Latitude p: DDMM.MMMMMMM,
-                strncpy(lat, p, strchr(p, ',') - p);
-                strncpy(degree, lat, 2);
-                strcpy(minute, lat+2);
-                gnss->lat = atof(degree) + atof(minute) / 60.0;
-                break;
-
-            case 4:
-                // Hemisphere of latitude
-                if(*p == 'S') {
-                    gnss->lat *= -1;
-                }
-                break;
-
-            case 5:
-                // Longitude p: DDDMM.MMMMMMM,
-                strncpy(lon, p, strchr(p, ',') - p);
-                strncpy(degree, lon, 3);
-                strcpy(minute, lon+3);
-                gnss->lon = atof(degree) + atof(minute) / 60.0;
-                break;
-
-            case 6:
-                // Hemisphere of longitude
-                if(*p == 'W') {
-                    gnss->lon *= -1;
-                }
-                break;
-
-            case 7:
-                // Speed
-                // strncpy(speed, p, strchr(p, ',') - p);
-                // gnss->speed = atof(speed);
-                break;
-
-            case 8:
-                // Course over ground
-                break;
-
-            case 9:
-                // Date
-                strncpy(dd, p, 2);
-                strncpy(mo, p+2, 2);
-                strncpy(yy, p+4, 2);
-                gnss->day = atoi(dd);
-                gnss->month = atoi(mo);
-                gnss->year = 2000 + atoi(yy);
-                break;
-
-            case 10:
-                // Magnetic variation
-                break;
-
-            case 11:
-                // ???
-                break;
-
-            case 12:
-                // Mode
-                if(*p == 'A') {
-                    gnss->mode = M_AUTO;
-                } else if(*p == 'D') {
-                    gnss->mode = M_DIFF;
-                } else {
-                    gnss->mode = M_UNKNOWN;
-                }
-                break;
-
-            case 13:
-                // Checksum
-                break;
-
-            default:
-                // fprintf(
-                //     stderr,
-                //     "Unknown colume number detected i=%d\n",
-                //     i
-                // );
-                return -1;
+    // Hemisphere of latitude: 4
+    if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 4, field_buf, FIELD_BUF_SZ)) > 0) {
+        if(field_buf[0] == 'S') {
+            gnss->lat *= -1;
         }
     }
+
+    // Longitude: 5 DDDMM.MMMMMMM
+    if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 5, field_buf, FIELD_BUF_SZ)) == 13) {
+        // gnss->lon = gps_atof(field_buf, field_sz_ret, 1);
+    }
+
+    // Hemisphere of longitude: 6
+    if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 6, field_buf, FIELD_BUF_SZ)) > 0) {
+        if(field_buf[0] == 'W') {
+            gnss->lon *= -1;
+        }
+    }
+
+    // Speed: 7
+    // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 7, field_buf, FIELD_BUF_SZ)) > 0) {
+        // strncpy(speed, p, strchr(p, ',') - p);
+        // gnss->speed = atof(speed);
+    // }
+
+    // Course over ground: 8
+
+    // Date: 9
+    // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 9, field_buf, FIELD_BUF_SZ)) > 0) {
+        // strncpy(dd, p, 2);
+        // strncpy(mo, p+2, 2);
+        // strncpy(yy, p+4, 2);
+        // gnss->day = atoi(dd);
+        // gnss->month = atoi(mo);
+        // gnss->year = 2000 + atoi(yy);
+    // }
+
+    // Magnetic variation: 10
+
+
+    // Mode: 12
+    if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 12, field_buf, FIELD_BUF_SZ)) > 0) {
+        if(field_buf[0] == 'A') {
+            gnss->mode = M_AUTO;
+        } else if(field_buf[0] == 'D') {
+            gnss->mode = M_DIFF;
+        } else {
+            gnss->mode = M_UNKNOWN;
+        }
+    }
+
+    // Checksum: 13
     return 0;
 }
 
 static int parse_gpgga_string(gnss_reader_t *gnss) {
-    const char *p = gnss->buf;
-    char hh[3], mm[3], ss[6];
-    char lat[8];
-    char lon[8];
-    char degree[8], minute[8];
-    for(int i = 1; i <= 13; i++) {
-        p = strchr(p, ',');
-        if(p == NULL) {
-            return -1;
-        }
-        p++; // point to the start of new colume
-        switch(i) {
-            case 0:
-                // Sentence ID
-                break;
+    // const char *p = gnss->buf;
+    // char hh[3], mm[3], ss[6];
+    // char lat[8];
+    // char lon[8];
+    // char degree[8], minute[8];
 
-            case 1:
-                // UTC time
-                strncpy(hh, p, 2);
-                strncpy(mm, p+2, 2);
-                strncpy(ss, p+4, 5);
-                gnss->utc_hour = atoi(hh);
-                gnss->utc_min = atoi(mm);
-                gnss->utc_sec  = atof(ss);
-                break;
+    char field_buf[FIELD_BUF_SZ];
+    char floatbuf[16];
+    int field_sz_ret;
 
-            case 2:
-                // Latitude p: DDMM.MMMMMMM,
-                strncpy(lat, p, strchr(p, ',') - p);
-                strncpy(degree, lat, 2);
-                strcpy(minute, lat+2);
-                gnss->lat = atof(degree) + atof(minute) / 60.0;
-                break;
+    // UTC time: 1
+    // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 1, field_buf, FIELD_BUF_SZ)) > 0) {
+    // }
 
-            case 3:
-                // Hemisphere of latitude
-                if(*p == 'S') {
-                    gnss->lat *= -1;
-                }
-                break;
+    // Latitude: 2
+    if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 2, field_buf, FIELD_BUF_SZ)) == 12) {
+        // gnss->lat = gps_atof(field_buf, field_sz_ret, 0);
+    }
 
-            case 4:
-                // Longitude p: DDDMM.MMMMMMM,
-                strncpy(lon, p, strchr(p, ',') - p);
-                strncpy(degree, lon, 3);
-                strcpy(minute, lon+3);
-                gnss->lon = atof(degree) + atof(minute) / 60.0;
-                break;
-
-            case 5:
-                // Hemisphere of longitude
-                if(*p == 'W') {
-                    gnss->lon *= -1;
-                }
-                break;
-            
-            case 6:
-                // Position fix indicator
-                break;
-
-            case 7:
-                // Sat used:
-                break;
-
-            case 8:
-                // hdop
-                break;
-
-            case 9:
-                // msl altitude
-                break;
-
-            case 10:
-                // units
-                break;
-
-            case 11:
-                // geoid seperation
-                break;
-
-            case 12:
-                // unit
-                break;
-
-            case 13:
-                // age of diff corr
-                break;
-
-            case 14:
-                // diff ref station id
-                break;
-
-            case 15:
-                // checksum
-                break;
-
-            default:
-                return -1;
+    // Hemisphere of latitude: 3
+    if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 3, field_buf, FIELD_BUF_SZ)) > 0) {
+        if(field_buf[0] == 'S') {
+            gnss->lat *= -1;
         }
     }
+
+    // Longitude: 4 DDDMM.MMMMMMM
+    if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 4, field_buf, FIELD_BUF_SZ)) == 13) {
+        // gnss->lon = gps_atof(field_buf, field_sz_ret, 0);
+    }
+
+    // Hemisphere of longitude: 5
+    if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 5, field_buf, FIELD_BUF_SZ)) > 0) {
+        if(field_buf[0] == 'W') {
+            gnss->lon *= -1;
+        }
+    }
+
+    // Position fix indicator: 6
+    // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 6, field_buf, FIELD_BUF_SZ)) > 0) {
+    // }
+
+    // Sat used: 7
+    // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 7, field_buf, FIELD_BUF_SZ)) > 0) {
+    // }
+
+    // hdop: 8
+    // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 8, field_buf, FIELD_BUF_SZ)) > 0) {
+    // }
+
+    // msl altitude: 9
+    // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 9, field_buf, FIELD_BUF_SZ)) > 0) {
+    // }
+
+    // units: 10
+    // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 10, field_buf, FIELD_BUF_SZ)) > 0) {
+    // }
+
+    // geoid seperation: 11
+    // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 11, field_buf, FIELD_BUF_SZ)) > 0) {
+    // }
+
+    // unit: 12
+    // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 12, field_buf, FIELD_BUF_SZ)) > 0) {
+    // }
+
+    // age of diff corr: 13
+    // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 13, field_buf, FIELD_BUF_SZ)) > 0) {
+    // }
+
+    // diff ref station id: 14
+    // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 14, field_buf, FIELD_BUF_SZ)) > 0) {
+    // }
+
+    // checksum: 15
+    // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 15, field_buf, FIELD_BUF_SZ)) > 0) {
+    // }
+
     return 0;
 }

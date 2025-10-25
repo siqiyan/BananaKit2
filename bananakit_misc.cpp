@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <string.h>
+#include <stdlib.h>
 #include <CRC.h>
 
 #include "bananakit.h"
@@ -84,7 +85,7 @@ int bytes2hex_str(uint8_t *input, int input_len, char *output, int output_limit)
     return j;
 }
 
-int float2str(float value, char *buf, int sz, int precision) {
+int float2str(double value, char *buf, int sz, int precision) {
   // Convert a float number into string for displaying.
   // Inputs:
   //    value - input float number
@@ -100,8 +101,9 @@ int float2str(float value, char *buf, int sz, int precision) {
 
   char *ptr = buf;
   int ivalue; // for integer part of the input value
-  float fvalue; // float point part
+  double fvalue; // float point part
   int idigit; // for counting digits
+  int fmulti;
 
   // Count how many digits integer part has:
   ivalue = (int) value;
@@ -124,7 +126,7 @@ int float2str(float value, char *buf, int sz, int precision) {
     // digit go first):
     ivalue = (int) value;
     for(int i = idigit - 1; i >= 0; i--) {
-      *(ptr + i) = (ivalue % 10) + '0';
+      *(ptr + i) = (abs(ivalue) % 10) + '0';
       ivalue /= 10;
     }
     ptr += idigit; // pointer move to the next available byte
@@ -138,14 +140,90 @@ int float2str(float value, char *buf, int sz, int precision) {
   } else {
     fvalue = value;
   }
+  fmulti = 1;
   for(int i = 0; i < precision; i++) {
-    fvalue *= 10;
-    *ptr++ = ((int) fvalue) % 10 + '0';
+    fmulti *= 10;
+    // fvalue *= 10;
+    *ptr++ = abs((int) (fvalue * (double) fmulti)) % 10 + '0';
   }
 
   *ptr++ = '\0'; // Put the termination mark at the end of buffer
 
   return ptr - buf;
+}
+
+// char *float2str_v2(float value, int precision) {
+    
+// }
+
+int str2float(const char *buf, int bufsz, double *output) {
+    // https://docs.arduino.cc/language-reference/en/variables/data-types/float/
+    // The float data type has only 6-7 decimal digits of precision.
+    // That means the total number of digits, not the number to the
+    // right of the decimal point. Unlike other platforms, where you
+    // can get more precision by using a double (e.g. up to 15 digits),
+    // on the Arduino board, double is the same size as float.
+
+    int fvalue; // float point part
+    double sign;
+    int ivalue; // integer part
+    double fmulti; // float point part multiplier
+    int i;
+    uint8_t state;
+
+    if(buf == NULL || output == NULL) {
+        return BK_ERR_NUL_PTR;
+    }
+
+    if(bufsz <= 0) {
+        return BK_ERR_EMPTY;
+    }
+
+    // Initial value:
+    fvalue = 0;
+    fmulti = 1.0;
+    ivalue = 0;
+    sign = 1.0;
+    if(buf[0] == '-') {
+        sign = -1.0;
+    }
+
+    // State:
+    //  0 - integer part
+    //  1 - float number part
+    state = 0;
+    for(i = 0; i < bufsz && buf[i] != '\0'; i++) {
+        if(state == 0) {
+            if(buf[i] == '.') {
+                state = 1;
+            } else if(IS_DIGIT(buf[i])) {
+                // if(ivalue >= 10000) {
+                //     break;
+                // }
+                ivalue *= 10;
+                ivalue += (int) TO_DIGIT(buf[i]);
+            } else {
+                // Non-digit character (nor '.') character encountered:
+                return BK_ERR_FORMAT;
+            }
+        } else if(state == 1) {
+            if(IS_DIGIT(buf[i])) {
+                // if(fvalue >= 10000) {
+                //     break;
+                // }
+                fvalue *= 10;
+                fvalue += (int) TO_DIGIT(buf[i]);
+                fmulti /= 10.0;
+            } else {
+                // Non-digit character encountered:
+                return BK_ERR_FORMAT;
+            }
+        }
+    }
+
+    *output = sign * ((double) ivalue + ((double) fvalue) * fmulti);
+    // *output = ((float) fvalue) * fmulti;;
+    return BK_SUCCESS;
 }
 
 int field_extract(
@@ -165,7 +243,7 @@ int field_extract(
 
     for(
         i = 0, j = 0, field_index_count = 0;
-        i < bufsz, j < field_sz - 1, field_index_count <= field_index;
+        i < bufsz && j < field_sz - 1 && field_index_count <= field_index;
         i++
     ) {
         if(field_index == field_index_count) {
@@ -176,41 +254,132 @@ int field_extract(
         }
     }
 
-    if(j >= 0) {
-        field[j] = '\0'; // replace the last character with NUL
+    if(j > 0) {
+        // Replace the unwanted last character (i.e. the ',') with NUL
+        field[j - 1] = '\0';
+    } else {
+        field[0] = '\0';
     }
-
-    return j;
+    return j - 1; // Return the actual character size in field buf (not include NUL)
 }
 
-float gps_atof(const char *buf, int bufsz, uint8_t format) {
-    char degree[4], minute[11];
+#define FLOAT_BUF_SZ 16
+int gps_atof(const char *buf, int bufsz, int ndd, double *output) {
+    char floatbuf[FLOAT_BUF_SZ];
+    double fvalue;
+    int ret_code;
+    int i, j;
 
-    if(format == 0) {
-        // Format 0: DDMM.MMMMMMM
+    // ndd == 2: DDMM.MMMMMMM
+    // ndd == 3: DDDMM.MMMMMMM
 
-        // strncpy(lat, p, strchr(p, ',') - p);
-        // strncpy(degree, lat, 2);
-        // strcpy(minute, lat+2);
-        // gnss->lat = atof(degree) + atof(minute) / 60.0;
-        degree[0] = buf[0];
-        degree[1] = buf[1];
-        degree[2] = '\0';
-        strncpy(minute, buf+2, 12);
-        return atof(degree) + atof(minute) / 60.0;
-    } else if(format == 1) {
-        // Format 1: DDDMM.MMMMMMM
-
-        // strncpy(lon, p, strchr(p, ',') - p);
-        // strncpy(degree, lon, 3);
-        // strcpy(minute, lon+3);
-        // gnss->lon = atof(degree) + atof(minute) / 60.0;
-        degree[0] = buf[0];
-        degree[1] = buf[1];
-        degree[2] = buf[2];
-        strncpy(minute, buf+3, 13);
-        return atof(degree) + atof(minute) / 60.0;
+    // Pre-checking:
+    if(buf == NULL || output == NULL) {
+        // Error: invalid pointer
+        return 0;
     }
+    if(bufsz <= 0) {
+        // Error: buffer size invalid
+        return -1;
+    }
+    // if(ndd < bufsz) {
+    //     // Error: buffer 
+    //     return -2;
+    // }
+    if(FLOAT_BUF_SZ < bufsz) {
+        return -3;
+    }
+
+    // Process the DD/DDD part:
+    for(i = 0; i < ndd; i++) {
+        if(IS_DIGIT(buf[i])) {
+            floatbuf[i] = buf[i];
+        } else {
+            return -4;
+        }
+    }
+    floatbuf[i] = '\0';
+    // ret_code = str2float(floatbuf, ndd, &fvalue);
+    // if(ret_code != BK_SUCCESS) {
+    //     return -5;
+    // }
+    // *output = fvalue;
+    // *output = atof(floatbuf);
+
+    // Process the MM.MMM... part:
+    for(i = ndd, j = 0; i < bufsz; i++) {
+        if(IS_DIGIT(buf[i]) || buf[i] == '.') {
+            floatbuf[j++] = buf[i];
+        } else {
+            return -6;
+        }
+    }
+    floatbuf[j] = '\0';
+    // ret_code = str2float(floatbuf, j, &fvalue);
+    // if(ret_code != BK_SUCCESS) {
+    //     return -7;
+    // }
+    *output = atof(floatbuf) / 60.0;
+    // *output = fvalue / 60.0;
+    // *output = fvalue;
+
+    return 1;
+
+    // if(format == 0) {
+    //     // strncpy(lat, p, strchr(p, ',') - p);
+    //     // strncpy(degree, lat, 2);
+    //     // strcpy(minute, lat+2);
+    //     // gnss->lat = atof(degree) + atof(minute) / 60.0;
+    //     degree[0] = buf[0];
+    //     degree[1] = buf[1];
+    //     degree[2] = '\0';
+    //     ret_code = str2float(degree, 4, &fdegree);
+    //     if(ret_code != BK_SUCCESS) {
+    //         return ret_code;
+    //     }
+
+    //     // strncpy(minute, buf+2, min(bufsz - 2, MINUTE_BUF_SZ));
+    //     // ret_code = str2float(minute, MINUTE_BUF_SZ, &fminute);
+    //     // if(ret_code != BK_SUCCESS) {
+    //     //     return ret_code;
+    //     // }
+    //     fminute = 0.0;
+
+    //     *output = fdegree + (fminute / 60.0);
+    //     return BK_SUCCESS;
+
+    //     // return atof(degree) + (atof(minute) / 60.0);
+
+    // } else if(format == 1) {
+        
+
+    //     // strncpy(lon, p, strchr(p, ',') - p);
+    //     // strncpy(degree, lon, 3);
+    //     // strcpy(minute, lon+3);
+    //     // gnss->lon = atof(degree) + atof(minute) / 60.0;
+    //     degree[0] = buf[0];
+    //     degree[1] = buf[1];
+    //     degree[2] = buf[2];
+    //     degree[3] = '\0';
+    //     ret_code = str2float(degree, 4, &fdegree);
+    //     if(ret_code != BK_SUCCESS) {
+    //         return ret_code;
+    //     }
+
+    //     // strncpy(minute, buf+3, min(bufsz - 3, MINUTE_BUF_SZ));
+    //     // ret_code = str2float(minute, MINUTE_BUF_SZ, &fminute);
+    //     // if(ret_code != BK_SUCCESS) {
+    //     //     return ret_code;
+    //     // }
+    //     fminute = 0.0;
+
+    //     *output = fdegree + (fminute / 60.0);
+    //     return BK_SUCCESS;
+
+    //     // return atof(degree) + (atof(minute) / 60.0);
+    // } else {
+    //     return BK_ERR_OTHER;
+    // }
 }
 
 // CRC8 checksum:

@@ -2,7 +2,7 @@
 #define __GNSS_READER_H__
 #include <stdint.h>
 
-#define GNSS_UART_BUF_SZ 40
+#define GNSS_UART_BUF_SZ 64
 #define FIELD_BUF_SZ 16
 
 typedef enum {

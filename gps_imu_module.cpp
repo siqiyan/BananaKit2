@@ -28,7 +28,7 @@ void gps_imu_module_init(void) {
     GPS_Serial.begin(9600);
     GPS_Serial.listen();
 
-    // Serial.begin(9600);
+    Serial.begin(9600);
 }
 
 node_status_t gps_imu_module_update(void) {
@@ -37,7 +37,7 @@ node_status_t gps_imu_module_update(void) {
     char c;
     uint8_t nmea_start;
 
-    IO.lcd_clear_callback();
+    // IO.lcd_clear_callback();
 
     if(GNSS == NULL) {
         snprintf(
@@ -55,6 +55,17 @@ node_status_t gps_imu_module_update(void) {
     //     Serial.write(c);
     // }
 
+    // snprintf(
+    //     IO.lcd_buf,
+    //     LCD_BUF_SIZE,
+    //     "wait gps reading"
+    // );
+    IO.flags = LCD_REFRESH_LINE0;
+    IO.lcd_refresh_callback();
+    while(!GPS_Serial.available()) {
+        delay(50);
+    }
+
     GNSS->buf_count = 0;
     nmea_start = 0;
     while(GPS_Serial.available() && GNSS->buf_count < GNSS_UART_BUF_SZ - 1) {
@@ -70,94 +81,186 @@ node_status_t gps_imu_module_update(void) {
     GNSS->buf[GNSS->buf_count] = '\0'; // set nul character
 
     char field_buf[FIELD_BUF_SZ];
+    char floatbuf[LCD_BUF_SIZE];
     // char floatbuf[16];
-    int field_sz_ret;
+    char hemisphere_lat;
+    char hemisphere_lon;
+    int field_sz;
+    int atof_ret;
+    double latlon;
+    IO.lcd_clear_callback();
     if(GNSS->buf_count >= 6) {
         if(strncmp(GNSS->buf, "$GPRMC", 6) == 0) {
 
+            // Hemisphere of latitude
+            field_sz = field_extract(GNSS->buf, GNSS->buf_count, ',', 4, field_buf, FIELD_BUF_SZ);
+            if((field_sz) > 0) {
+                hemisphere_lat = field_buf[0];
+            } else {
+                hemisphere_lat = '!';
+            }
+
+            // Hemisphere of longitude
+            field_sz = field_extract(GNSS->buf, GNSS->buf_count, ',', 6, field_buf, FIELD_BUF_SZ);
+            if(field_sz > 0) {
+                hemisphere_lon = field_buf[0];
+            } else {
+                hemisphere_lon = '!';
+            }
+
             // Latitude: 3 DDMM.MMMMMMM
-            if((field_sz_ret = field_extract(GNSS->buf, GNSS->buf_count, ',', 3, field_buf, FIELD_BUF_SZ)) == 12) {
-                snprintf(
-                    IO.lcd_buf,
-                    LCD_BUF_SIZE,
-                    "lat:%s",
-                    field_buf
-                );
+            field_sz = field_extract(GNSS->buf, GNSS->buf_count, ',', 3, field_buf, FIELD_BUF_SZ);
+            if(field_sz >= 7) {
+                // snprintf(
+                //     IO.lcd_buf,
+                //     LCD_BUF_SIZE,
+                //     "lat:\"%s\"",
+                //     field_buf
+                // );
+                // IO.flags = LCD_REFRESH_LINE0;
+                // IO.lcd_refresh_callback();
+
+                atof_ret = gps_atof(field_buf, field_sz, 2, &latlon);
+                if(atof_ret != 1) {
+                    snprintf(
+                        IO.lcd_buf,
+                        LCD_BUF_SIZE,
+                        "lat:float err%d",
+                        atof_ret
+                    );
+                } else {
+                    float2str(latlon, floatbuf, LCD_BUF_SIZE, 8);
+                    snprintf(
+                        IO.lcd_buf,
+                        LCD_BUF_SIZE,
+                        "lat:%c%s",
+                        hemisphere_lat,
+                        floatbuf
+                    );
+                    Serial.print("lat:");
+                    Serial.println(latlon);
+                }
             } else {
                 snprintf(
                     IO.lcd_buf,
                     LCD_BUF_SIZE,
-                    "ret:%d",
-                    field_sz_ret
+                    "field_sz:%d",
+                    field_sz
                 );
             }
             IO.flags = LCD_REFRESH_LINE0;
             IO.lcd_refresh_callback();
 
             // Longitude: 5 DDDMM.MMMMMMM
-            if((field_sz_ret = field_extract(GNSS->buf, GNSS->buf_count, ',', 5, field_buf, FIELD_BUF_SZ)) == 13) {
-                snprintf(
-                    IO.lcd_buf,
-                    LCD_BUF_SIZE,
-                    "lon:%s",
-                    field_buf
-                );
+            field_sz = field_extract(GNSS->buf, GNSS->buf_count, ',', 5, field_buf, FIELD_BUF_SZ);
+            if(field_sz >= 8) {
+                // snprintf(
+                //     IO.lcd_buf,
+                //     LCD_BUF_SIZE,
+                //     "lon:\"%s\"",
+                //     field_buf
+                // );
+                // IO.flags = LCD_REFRESH_LINE1;
+                // IO.lcd_refresh_callback();
+
+                atof_ret = gps_atof(field_buf, field_sz, 3, &latlon);
+                if(atof_ret != 1) {
+                    snprintf(
+                        IO.lcd_buf,
+                        LCD_BUF_SIZE,
+                        "lon:float err%d",
+                        atof_ret
+                    );
+                } else {
+                    float2str(latlon, floatbuf, LCD_BUF_SIZE, 8);
+                    snprintf(
+                        IO.lcd_buf,
+                        LCD_BUF_SIZE,
+                        "lon:%c%s",
+                        hemisphere_lon,
+                        floatbuf
+                    );
+                    Serial.print("lon:");
+                    Serial.println(latlon);
+                }
+                
             } else {
                 snprintf(
                     IO.lcd_buf,
                     LCD_BUF_SIZE,
-                    "ret:%d",
-                    field_sz_ret
+                    "field_sz:%d",
+                    field_sz
                 );
             }
             IO.flags = LCD_REFRESH_LINE1;
             IO.lcd_refresh_callback();
 
-        } else if(strncmp(GNSS->buf, "$GPGGA", 6) == 0) {
-
-            // Latitude: 3 DDMM.MMMMMMM
-            if((field_sz_ret = field_extract(GNSS->buf, GNSS->buf_count, ',', 2, field_buf, FIELD_BUF_SZ)) == 12) {
-                snprintf(
-                    IO.lcd_buf,
-                    LCD_BUF_SIZE,
-                    "lat:%s",
-                    field_buf
-                );
-            } else {
-                snprintf(
-                    IO.lcd_buf,
-                    LCD_BUF_SIZE,
-                    "ret:%d",
-                    field_sz_ret
-                );
-            }
-            IO.flags = LCD_REFRESH_LINE0;
-            IO.lcd_refresh_callback();
-
-            // Longitude: 4 DDDMM.MMMMMMM
-            if((field_sz_ret = field_extract(GNSS->buf, GNSS->buf_count, ',', 4, field_buf, FIELD_BUF_SZ)) == 13) {
-                snprintf(
-                    IO.lcd_buf,
-                    LCD_BUF_SIZE,
-                    "lon:%s",
-                    field_buf
-                );
-            } else {
-                snprintf(
-                    IO.lcd_buf,
-                    LCD_BUF_SIZE,
-                    "ret:%d",
-                    field_sz_ret
-                );
-            }
-            IO.flags = LCD_REFRESH_LINE1;
+            snprintf(
+                IO.lcd_buf,
+                LCD_BUF_SIZE,
+                "GPRMC"
+            );
+            IO.flags = LCD_REFRESH_LINE2;
             IO.lcd_refresh_callback();
         }
         
+        // else if(strncmp(GNSS->buf, "$GPGGA", 6) == 0) {
+
+        //     // Latitude: 3 DDMM.MMMMMMM
+        //     if((field_sz_ret = field_extract(GNSS->buf, GNSS->buf_count, ',', 2, field_buf, FIELD_BUF_SZ)) >= 7) {
+        //         snprintf(
+        //             IO.lcd_buf,
+        //             LCD_BUF_SIZE,
+        //             "lat:%s",
+        //             field_buf
+        //         );
+        //     } else {
+        //         snprintf(
+        //             IO.lcd_buf,
+        //             LCD_BUF_SIZE,
+        //             "ret:%d",
+        //             field_sz_ret
+        //         );
+        //     }
+        //     IO.flags = LCD_REFRESH_LINE0;
+        //     IO.lcd_refresh_callback();
+
+        //     // Longitude: 4 DDDMM.MMMMMMM
+        //     if((field_sz_ret = field_extract(GNSS->buf, GNSS->buf_count, ',', 4, field_buf, FIELD_BUF_SZ)) >= 8) {
+        //         snprintf(
+        //             IO.lcd_buf,
+        //             LCD_BUF_SIZE,
+        //             "lon:%s",
+        //             field_buf
+        //         );
+        //     } else {
+        //         snprintf(
+        //             IO.lcd_buf,
+        //             LCD_BUF_SIZE,
+        //             "ret:%d",
+        //             field_sz_ret
+        //         );
+        //     }
+        //     IO.flags = LCD_REFRESH_LINE1;
+        //     IO.lcd_refresh_callback();
+
+        //     snprintf(
+        //         IO.lcd_buf,
+        //         LCD_BUF_SIZE,
+        //         "GPGGA"
+        //     );
+        //     IO.flags = LCD_REFRESH_LINE2;
+        //     IO.lcd_refresh_callback();
+        // }
+        
     } else {
-        snprintf(IO.lcd_buf, LCD_BUF_SIZE, "buf_count:%d", GNSS->buf_count);
-        IO.flags = LCD_REFRESH_LINE0;
-        IO.lcd_refresh_callback();
+        // snprintf(IO.lcd_buf, LCD_BUF_SIZE, "skip short buf");
+        // IO.flags = LCD_REFRESH_LINE0;
+        // IO.lcd_refresh_callback();
+
+        // snprintf(IO.lcd_buf, LCD_BUF_SIZE, "buf_count:%d", GNSS->buf_count);
+        // IO.flags = LCD_REFRESH_LINE1;
+        // IO.lcd_refresh_callback();
     }
 
     // gnss_ret = parse_gnss_data_buf(GNSS);
@@ -256,7 +359,7 @@ node_status_t gps_imu_module_update(void) {
             break;
     }
 
-    delay(500);
+    delay(1000);
 
     return next_status;
 }
