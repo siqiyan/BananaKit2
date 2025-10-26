@@ -4,10 +4,32 @@
 #include "bananakit_misc.h"
 #include "gnss_reader.h"
 
+#define FIELD_BUF_SZ 16
+#define DIGIT_BUF_SZ 16
 
 static int parse_gprmc_string(gnss_reader_t *gnss);
 static int parse_gpgga_string(gnss_reader_t *gnss);
-
+static int convert_verify_latlon(
+    const char *field,
+    int n,
+    int ndd,
+    int16_t *degree,
+    double *minute
+);
+static int convert_verify_utc_time(
+    const char *field,
+    int n,
+    int8_t *hour,
+    int8_t *minute,
+    double *second
+);
+static int convert_verify_date(
+    const char *field,
+    int n,
+    int16_t *year,
+    int8_t *month,
+    int16_t *day
+);
 
 gnss_reader_t *create_gnss_reader(void) {
     gnss_reader_t *gnss_ptr;
@@ -17,17 +39,19 @@ gnss_reader_t *create_gnss_reader(void) {
         return NULL;
     }
 
-    gnss_ptr->valid = 0;
-    gnss_ptr->lat = 0;
-    gnss_ptr->lon = 0;
+    gnss_ptr->data_valid = 0;
+    gnss_ptr->latitude_degree = 0;
+    gnss_ptr->latitude_minute = 0.0;
+    gnss_ptr->latitude_hemisphere = '\0';
+    gnss_ptr->longitude_degree = 0;
+    gnss_ptr->longitude_minute = 0.0;
+    gnss_ptr->longitude_hemisphere = '\0';
     gnss_ptr->utc_hour = 0;
     gnss_ptr->utc_min = 0;
-    gnss_ptr->utc_sec = 0;
-    gnss_ptr->speed = 0;
+    gnss_ptr->utc_sec = 0.0;
     gnss_ptr->year = 0;
     gnss_ptr->month = 0;
     gnss_ptr->day = 0;
-    gnss_ptr->mode = M_UNKNOWN;
     gnss_ptr->buf[0] = '\0';
     gnss_ptr->buf_count = 0;
 
@@ -97,90 +121,102 @@ int parse_gnss_data_buf(gnss_reader_t *gnss) {
 
 static int parse_gprmc_string(gnss_reader_t *gnss) {
     char field_buf[FIELD_BUF_SZ];
-    char floatbuf[16];
-    int field_sz_ret;
+    char time_buf[TIME_BUF_SZ];
+    int field_sz;
+    int ret_code;
 
-    // UTC time: 1
-    // TODO
-    // strncpy(hh, p, 2);
-    // strncpy(mm, p+2, 2);
-    // strncpy(ss, p+4, 5);
-    // gnss->utc_hour = atoi(hh);
-    // gnss->utc_min = atoi(mm);
-    // gnss->utc_sec  = atof(ss);
+    gnss->data_valid = 1;
 
-    // Status: 2
-    if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 2, field_buf, FIELD_BUF_SZ)) > 0) {
-        gnss->valid = (field_buf[0] == 'A');
+    // Hemisphere of latitude
+    field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 4, field_buf, FIELD_BUF_SZ);
+    if((field_sz) > 0) {
+        gnss->latitude_hemisphere = field_buf[0];
+    } else {
+        gnss->latitude_hemisphere = '\0';
+        gnss->data_valid = 0;
+    }
+
+    // Hemisphere of longitude
+    field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 6, field_buf, FIELD_BUF_SZ);
+    if(field_sz > 0) {
+        gnss->longitude_hemisphere = field_buf[0];
+    } else {
+        gnss->longitude_hemisphere = '\0';
+        gnss->data_valid = 0;
     }
 
     // Latitude: 3 DDMM.MMMMMMM
-    if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 3, field_buf, FIELD_BUF_SZ)) == 12) {
-        // gnss->lat = gps_atof(field_buf, field_sz_ret, 0);
-    }
-
-    // Hemisphere of latitude: 4
-    if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 4, field_buf, FIELD_BUF_SZ)) > 0) {
-        if(field_buf[0] == 'S') {
-            gnss->lat *= -1;
+    field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 3, field_buf, FIELD_BUF_SZ);
+    if(field_sz >= 7) {
+        ret_code = convert_verify_latlon(
+            field_buf,
+            field_sz,
+            2,
+            &gnss->latitude_degree,
+            &gnss->latitude_minute
+        );
+        if(ret_code != 1) {
+            gnss->data_valid = 0;
         }
+    } else {
+        gnss->data_valid = 0;
     }
 
     // Longitude: 5 DDDMM.MMMMMMM
-    if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 5, field_buf, FIELD_BUF_SZ)) == 13) {
-        // gnss->lon = gps_atof(field_buf, field_sz_ret, 1);
-    }
-
-    // Hemisphere of longitude: 6
-    if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 6, field_buf, FIELD_BUF_SZ)) > 0) {
-        if(field_buf[0] == 'W') {
-            gnss->lon *= -1;
+    field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 5, field_buf, FIELD_BUF_SZ);
+    if(field_sz >= 8) {
+        ret_code = convert_verify_latlon(
+            field_buf,
+            field_sz,
+            3,
+            &gnss->longitude_degree,
+            &gnss->longitude_minute
+        );
+        if(ret_code != 1) {
+            gnss->data_valid = 0;
         }
+    } else {
+        gnss->data_valid = 0;
     }
 
-    // Speed: 7
-    // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 7, field_buf, FIELD_BUF_SZ)) > 0) {
-        // strncpy(speed, p, strchr(p, ',') - p);
-        // gnss->speed = atof(speed);
-    // }
-
-    // Course over ground: 8
+    // UTC time: 1
+    field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 1, field_buf, FIELD_BUF_SZ);
+    if(field_sz >= 6) {
+        ret_code = convert_verify_utc_time(
+            field_buf,
+            field_sz,
+            &gnss->utc_hour,
+            &gnss->utc_min,
+            &gnss->utc_sec
+        );
+        if(ret_code != 1) {
+            gnss->data_valid = 0;
+        }
+    } else {
+        gnss->data_valid = 0;
+    }
 
     // Date: 9
-    // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 9, field_buf, FIELD_BUF_SZ)) > 0) {
-        // strncpy(dd, p, 2);
-        // strncpy(mo, p+2, 2);
-        // strncpy(yy, p+4, 2);
-        // gnss->day = atoi(dd);
-        // gnss->month = atoi(mo);
-        // gnss->year = 2000 + atoi(yy);
-    // }
-
-    // Magnetic variation: 10
-
-
-    // Mode: 12
-    if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 12, field_buf, FIELD_BUF_SZ)) > 0) {
-        if(field_buf[0] == 'A') {
-            gnss->mode = M_AUTO;
-        } else if(field_buf[0] == 'D') {
-            gnss->mode = M_DIFF;
-        } else {
-            gnss->mode = M_UNKNOWN;
+    field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 9, field_buf, FIELD_BUF_SZ);
+    if(field_sz >= 6) {
+        ret_code = convert_verify_date(
+            field_buf,
+            field_sz,
+            &gnss->year,
+            &gnss->month,
+            &gnss->day
+        );
+        if(ret_code != 1) {
+            gnss->data_valid = 0;
         }
+    } else {
+        gnss->data_valid = 0;
     }
 
-    // Checksum: 13
     return 0;
 }
 
 static int parse_gpgga_string(gnss_reader_t *gnss) {
-    // const char *p = gnss->buf;
-    // char hh[3], mm[3], ss[6];
-    // char lat[8];
-    // char lon[8];
-    // char degree[8], minute[8];
-
     char field_buf[FIELD_BUF_SZ];
     char floatbuf[16];
     int field_sz_ret;
@@ -254,4 +290,204 @@ static int parse_gpgga_string(gnss_reader_t *gnss) {
     // }
 
     return 0;
+}
+
+static int convert_verify_latlon(
+    const char *field,
+    int n,
+    int ndd,
+    int16_t *degree,
+    double *minute
+) {
+    // Convert and verify string to latitude(in degree and minute)
+    // or longitude (also in degree and minute) depend on format:
+    // The format is determined by ndd:
+    // ndd == 2: "DDMM.MMMMMMM"
+    // ndd == 3: "DDDMM.MMMMMMM"
+
+    char digitbuf[DIGIT_BUF_SZ];
+    double fvalue;
+    int i, j;    
+
+    // Pre-checking:
+    if(field == NULL || degree == NULL || minute == NULL) {
+        // Error: invalid pointer
+        return 0;
+    }
+    if(n <= 0) {
+        // Error: string size invalid
+        return -1;
+    }
+    if(ndd >= n) {
+        // Error: ndd invalid 
+        return -2;
+    }
+    if(n > DIGIT_BUF_SZ - 1) {
+        // Error: digit buffer size too small
+        return -3;
+    }
+
+    // Process the DD/DDD part:
+    for(i = 0; i < ndd; i++) {
+        if(IS_DIGIT(buf[i])) {
+            digitbuf[i] = field[i];
+        } else {
+            // Error: invalid character found
+            return -4;
+        }
+    }
+    digitbuf[i] = '\0';
+    *degree = atoi(digitbuf);
+
+    // Process the MM.MMM... part:
+    for(i = ndd, j = 0; i < n; i++) {
+        if(IS_DIGIT(field[i]) || field[i] == '.') {
+            digitbuf[j++] = field[i];
+        } else {
+            // Error: invalid character found
+            return -5;
+        }
+    }
+    digitbuf[j] = '\0';
+    *minute = atof(digitbuf);
+
+    return 1; // Success
+}
+
+#define IDX_MINUTE 2
+#define IDX_SECOND 4
+static int convert_verify_utc_time(
+    const char *field,
+    int n,
+    int8_t *hour,
+    int8_t *minute,
+    double *second
+) {
+    char digitbuf[DIGIT_BUF_SZ];
+    int i, j;
+
+    // Pre-checking:
+    if(field == NULL || hour == NULL || minute == NULL || second == NULL) {
+        // Error: invalid pointer
+        return 0;
+    }
+    if(n <= 0) {
+        // Error: string size invalid
+        return -1;
+    }
+    if(n > DIGIT_BUF_SZ - 1) {
+        // Error: digit buffer size too small
+        return -2;
+    }
+
+    for(i = 0; i < IDX_MINUTE; i++) {
+        if(IS_DIGIT(field[i])) {
+            digitbuf[i] = field[i];
+        } else {
+            // Error: invalid character found
+            return -3;
+        }
+    }
+    digitbuf[i] = '\0';
+    *hour = atoi(digitbuf);
+
+    for(i = IDX_MINUTE, j = 0; i < IDX_SECOND; i++) {
+        if(IS_DIGIT(field[i])) {
+            digitbuf[j++] = field[i];
+        } else {
+            // Error: invalid character found
+            return -4;
+        }
+    }
+    digitbuf[j] = '\0';
+    *minute = atoi(digitbuf);
+
+    for(i = IDX_SECOND, j = 0; i < n; i++) {
+        if(IS_DIGIT(field[i] || field[i] == '.')) {
+            digitbuf[j++] = field[i];
+        } else {
+            // Error: invalid character found
+            return -5;
+        }
+    }
+    digitbuf[j] = '\0';
+    *second = atof(digitbuf);
+
+    return 1; // Success
+
+    // strncpy(hh, p, 2);
+    // strncpy(mm, p+2, 2);
+    // strncpy(ss, p+4, 5);
+    // gnss->utc_hour = atoi(hh);
+    // gnss->utc_min = atoi(mm);
+    // gnss->utc_sec  = atof(ss);
+}
+
+#define IDX_MONTH 2
+#define IDX_YEAR 4
+static int convert_verify_date(
+    const char *field,
+    int n,
+    int16_t *year,
+    int8_t *month,
+    int16_t *day
+) {
+    char digitbuf[DIGIT_BUF_SZ];
+    int i, j;
+
+    // Pre-checking:
+    if(field == NULL || hour == NULL || minute == NULL || second == NULL) {
+        // Error: invalid pointer
+        return 0;
+    }
+    if(n <= 0) {
+        // Error: string size invalid
+        return -1;
+    }
+    if(n > DIGIT_BUF_SZ - 1) {
+        // Error: digit buffer size too small
+        return -2;
+    }
+
+    for(i = 0; i < IDX_MONTH; i++) {
+        if(IS_DIGIT(field[i])) {
+            digitbuf[i] = field[i];
+        } else {
+            // Error: invalid character found
+            return -3;
+        }
+    }
+    digitbuf[i] = '\0';
+    *day = atoi(digitbuf);
+
+    for(i = IDX_MONTH, j = 0; i < IDX_YEAR; i++) {
+        if(IS_DIGIT(field[i])) {
+            digitbuf[j++] = field[i];
+        } else {
+            // Error: invalid character found
+            return -4;
+        }
+    }
+    digitbuf[j] = '\0';
+    *month = atoi(digitbuf);
+
+    for(i = IDX_YEAR, j = 0; i < n; i++) {
+        if(IS_DIGIT(field[i])) {
+            digitbuf[j++] = field[i];
+        } else {
+            // Error: invalid character found
+            return -5;
+        }
+    }
+    digitbuf[j] = '\0';
+    *year = atoi(digitbuf) + 2000;
+
+    return 1; // Success
+
+    // strncpy(dd, p, 2);
+    // strncpy(mo, p+2, 2);
+    // strncpy(yy, p+4, 2);
+    // gnss->day = atoi(dd);
+    // gnss->month = atoi(mo);
+    // gnss->year = 2000 + atoi(yy);
 }

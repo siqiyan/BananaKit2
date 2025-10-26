@@ -3,27 +3,26 @@
 #include <stdint.h>
 
 #define GNSS_UART_BUF_SZ 64
-#define FIELD_BUF_SZ 16
-
-typedef enum {
-    M_UNKNOWN,
-    M_AUTO,
-    M_DIFF
-} gnss_mode_t;
 
 typedef struct {
-    gnss_mode_t mode;
-    float lat;
-    float lon;
-    float alt;
-    int16_t utc_hour;
-    int16_t utc_min;
-    float utc_sec;
-    float speed;
+    uint8_t data_valid;
+
+    int16_t latitude_degree;
+    double latitude_minute;
+    char latitude_hemisphere;
+
+    int16_t longitude_degree;
+    double longitude_minute;
+    char longitude_hemisphere;
+
+    int8_t utc_hour;
+    int8_t utc_min;
+    double utc_sec;
+
     int16_t year;
-    int16_t month;
+    int8_t month;
     int16_t day;
-    uint8_t valid;
+
     char buf[GNSS_UART_BUF_SZ];
     int16_t buf_count;
 } gnss_reader_t;
