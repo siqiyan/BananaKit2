@@ -77,41 +77,42 @@ int parse_gnss_data_buf(gnss_reader_t *gnss) {
     }
 
     if(strncmp(gnss->buf, "$GPRMC", 6) == 0) {
-
         if(parse_gprmc_string(gnss) == 1) {
-            return GNSS_SUCCESS;
+            return 2;
         } else {
             return -2;
         }
-
     } else if(strncmp(gnss->buf, "$GPGGA", 6) == 0) {
-
-        return -3;
+        if(parse_gpgga_string(gnss) == 1) {
+            return 3;
+        } else {
+            return -3;
+        }
     }
     
-    // else if(strncmp(gnss->buf, "$GPVTG", 6) == 0) {
+    else if(strncmp(gnss->buf, "$GPVTG", 6) == 0) {
 
-    //     // TODO
-    //     return GNSS_ERR_GPVTG;
+        // TODO
+        return -4;
 
-    // } else if(strncmp(gnss->buf, "$GPGLL", 6) == 0) {
+    } else if(strncmp(gnss->buf, "$GPGLL", 6) == 0) {
 
-    //     // TODO
-    //     return GNSS_ERR_GPGLL;
+        // TODO
+        return -5;
 
-    // } else if(strncmp(gnss->buf, "$GPGSV", 6) == 0) {
+    } else if(strncmp(gnss->buf, "$GPGSV", 6) == 0) {
 
-    //     // TODO
-    //     return GNSS_ERR_GPGSV;
+        // TODO
+        return -6;
 
-    // }  else if(strncmp(gnss->buf, "$GPGSA", 6) == 0) {
+    }  else if(strncmp(gnss->buf, "$GPGSA", 6) == 0) {
 
-    //     // TODO
-    //     return GNSS_ERR_GPGSA;
+        // TODO
+        return -7;
 
-    // }
+    }
 
-    return -4;
+    return -8;
 }
 
 static int parse_gprmc_string(gnss_reader_t *gnss) {
@@ -237,37 +238,101 @@ static int parse_gprmc_string(gnss_reader_t *gnss) {
 }
 
 static int parse_gpgga_string(gnss_reader_t *gnss) {
-    // char field_buf[FIELD_BUF_SZ];
-    // char floatbuf[16];
-    // int field_sz_ret;
+    char field_buf[FIELD_BUF_SZ];
+    int field_sz;
+    int ret_code;
 
-    // // UTC time: 1
-    // // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 1, field_buf, FIELD_BUF_SZ)) > 0) {
-    // // }
+    gnss->data_valid = 1;
+    gnss->debug_code = 0;
+    gnss->debug_code2 = 0;
 
-    // // Latitude: 2
-    // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 2, field_buf, FIELD_BUF_SZ)) == 12) {
-    //     // gnss->lat = gps_atof(field_buf, field_sz_ret, 0);
-    // }
+    // UTC time: 1
+    field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 1, field_buf, FIELD_BUF_SZ);
+    if(field_sz >= 6) {
+        ret_code = convert_verify_utc_time(
+            field_buf,
+            field_sz,
+            &gnss->utc_hour,
+            &gnss->utc_min,
+            &gnss->utc_sec
+        );
+        if(ret_code != 1) {
+            gnss->data_valid = 0;
+            gnss->debug_code = -7;
+            gnss->debug_code2 = ret_code;
+            return -7;
+        }
+    } else {
+        gnss->data_valid = 0;
+        gnss->debug_code = -8;
+        return -8;
+    }
 
-    // // Hemisphere of latitude: 3
-    // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 3, field_buf, FIELD_BUF_SZ)) > 0) {
-    //     if(field_buf[0] == 'S') {
-    //         gnss->lat *= -1;
-    //     }
-    // }
+    // Latitude: 2
+    field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 2, field_buf, FIELD_BUF_SZ);
+    if(field_sz >= 7) {
+        ret_code = convert_verify_latlon(
+            field_buf,
+            field_sz,
+            2,
+            &gnss->latitude_degree,
+            &gnss->latitude_minute
+        );
+        if(ret_code != 1) {
+            gnss->data_valid = 0;
+            gnss->debug_code = -3;
+            gnss->debug_code2 = ret_code;
+            return -3;
+        }
+    } else {
+        gnss->data_valid = 0;
+        gnss->debug_code = -4;
+        return -4;
+    }
 
-    // // Longitude: 4 DDDMM.MMMMMMM
-    // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 4, field_buf, FIELD_BUF_SZ)) == 13) {
-    //     // gnss->lon = gps_atof(field_buf, field_sz_ret, 0);
-    // }
+    // Hemisphere of latitude: 3
+    field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 3, field_buf, FIELD_BUF_SZ);
+    if((field_sz) > 0) {
+        gnss->latitude_hemisphere = field_buf[0];
+    } else {
+        gnss->latitude_hemisphere = '\0';
+        gnss->data_valid = 0;
+        gnss->debug_code = -1;
+        return -1;
+    }
 
-    // // Hemisphere of longitude: 5
-    // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 5, field_buf, FIELD_BUF_SZ)) > 0) {
-    //     if(field_buf[0] == 'W') {
-    //         gnss->lon *= -1;
-    //     }
-    // }
+    // Longitude: 4 DDDMM.MMMMMMM
+    field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 4, field_buf, FIELD_BUF_SZ);
+    if(field_sz >= 8) {
+        ret_code = convert_verify_latlon(
+            field_buf,
+            field_sz,
+            3,
+            &gnss->longitude_degree,
+            &gnss->longitude_minute
+        );
+        if(ret_code != 1) {
+            gnss->data_valid = 0;
+            gnss->debug_code = -5;
+            gnss->debug_code2 = ret_code;
+            return -5;
+        }
+    } else {
+        gnss->data_valid = 0;
+        gnss->debug_code = -6;
+        return -6;
+    }
+
+    // Hemisphere of longitude: 5
+    field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 5, field_buf, FIELD_BUF_SZ);
+    if(field_sz > 0) {
+        gnss->longitude_hemisphere = field_buf[0];
+    } else {
+        gnss->longitude_hemisphere = '\0';
+        gnss->data_valid = 0;
+        gnss->debug_code = -2;
+        return -2;
+    }
 
     // Position fix indicator: 6
     // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 6, field_buf, FIELD_BUF_SZ)) > 0) {
