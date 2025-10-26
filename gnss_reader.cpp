@@ -69,29 +69,24 @@ int destroy_gnss_reader(gnss_reader_t *gnss) {
 
 int parse_gnss_data_buf(gnss_reader_t *gnss) {
     if(gnss == NULL) {
-        return GNSS_ERR_NUL_PTR;
+        return 0;
     }
 
     if(gnss->buf_count < 6) {
-        return GNSS_ERR_EMPTY;
+        return -1;
     }
 
     if(strncmp(gnss->buf, "$GPRMC", 6) == 0) {
 
-        if(parse_gprmc_string(gnss) == 0) {
+        if(parse_gprmc_string(gnss) == 1) {
             return GNSS_SUCCESS;
         } else {
-            return GNSS_ERR_GPRMC;
+            return -2;
         }
 
     } else if(strncmp(gnss->buf, "$GPGGA", 6) == 0) {
 
-        if(parse_gpgga_string(gnss) == 0) {
-            return GNSS_SUCCESS;
-        } else {
-            return GNSS_ERR_GPGGA;
-        }
-
+        return -3;
     }
     
     // else if(strncmp(gnss->buf, "$GPVTG", 6) == 0) {
@@ -116,16 +111,17 @@ int parse_gnss_data_buf(gnss_reader_t *gnss) {
 
     // }
 
-    return GNSS_ERR_UNKNOWN;
+    return -4;
 }
 
 static int parse_gprmc_string(gnss_reader_t *gnss) {
     char field_buf[FIELD_BUF_SZ];
-    char time_buf[TIME_BUF_SZ];
     int field_sz;
     int ret_code;
 
     gnss->data_valid = 1;
+    gnss->debug_code = 0;
+    gnss->debug_code2 = 0;
 
     // Hemisphere of latitude
     field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 4, field_buf, FIELD_BUF_SZ);
@@ -134,6 +130,8 @@ static int parse_gprmc_string(gnss_reader_t *gnss) {
     } else {
         gnss->latitude_hemisphere = '\0';
         gnss->data_valid = 0;
+        gnss->debug_code = -1;
+        return -1;
     }
 
     // Hemisphere of longitude
@@ -143,6 +141,8 @@ static int parse_gprmc_string(gnss_reader_t *gnss) {
     } else {
         gnss->longitude_hemisphere = '\0';
         gnss->data_valid = 0;
+        gnss->debug_code = -2;
+        return -2;
     }
 
     // Latitude: 3 DDMM.MMMMMMM
@@ -157,9 +157,14 @@ static int parse_gprmc_string(gnss_reader_t *gnss) {
         );
         if(ret_code != 1) {
             gnss->data_valid = 0;
+            gnss->debug_code = -3;
+            gnss->debug_code2 = ret_code;
+            return -3;
         }
     } else {
         gnss->data_valid = 0;
+        gnss->debug_code = -4;
+        return -4;
     }
 
     // Longitude: 5 DDDMM.MMMMMMM
@@ -174,9 +179,14 @@ static int parse_gprmc_string(gnss_reader_t *gnss) {
         );
         if(ret_code != 1) {
             gnss->data_valid = 0;
+            gnss->debug_code = -5;
+            gnss->debug_code2 = ret_code;
+            return -5;
         }
     } else {
         gnss->data_valid = 0;
+        gnss->debug_code = -6;
+        return -6;
     }
 
     // UTC time: 1
@@ -191,12 +201,17 @@ static int parse_gprmc_string(gnss_reader_t *gnss) {
         );
         if(ret_code != 1) {
             gnss->data_valid = 0;
+            gnss->debug_code = -7;
+            gnss->debug_code2 = ret_code;
+            return -7;
         }
     } else {
         gnss->data_valid = 0;
+        gnss->debug_code = -8;
+        return -8;
     }
 
-    // Date: 9
+    // // Date: 9
     field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 9, field_buf, FIELD_BUF_SZ);
     if(field_sz >= 6) {
         ret_code = convert_verify_date(
@@ -208,46 +223,51 @@ static int parse_gprmc_string(gnss_reader_t *gnss) {
         );
         if(ret_code != 1) {
             gnss->data_valid = 0;
+            gnss->debug_code = -9;
+            gnss->debug_code2 = ret_code;
+            return -9;
         }
     } else {
         gnss->data_valid = 0;
+        gnss->debug_code = -10;
+        return -10;
     }
 
-    return 0;
+    return 1;
 }
 
 static int parse_gpgga_string(gnss_reader_t *gnss) {
-    char field_buf[FIELD_BUF_SZ];
-    char floatbuf[16];
-    int field_sz_ret;
+    // char field_buf[FIELD_BUF_SZ];
+    // char floatbuf[16];
+    // int field_sz_ret;
 
-    // UTC time: 1
-    // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 1, field_buf, FIELD_BUF_SZ)) > 0) {
+    // // UTC time: 1
+    // // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 1, field_buf, FIELD_BUF_SZ)) > 0) {
+    // // }
+
+    // // Latitude: 2
+    // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 2, field_buf, FIELD_BUF_SZ)) == 12) {
+    //     // gnss->lat = gps_atof(field_buf, field_sz_ret, 0);
     // }
 
-    // Latitude: 2
-    if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 2, field_buf, FIELD_BUF_SZ)) == 12) {
-        // gnss->lat = gps_atof(field_buf, field_sz_ret, 0);
-    }
+    // // Hemisphere of latitude: 3
+    // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 3, field_buf, FIELD_BUF_SZ)) > 0) {
+    //     if(field_buf[0] == 'S') {
+    //         gnss->lat *= -1;
+    //     }
+    // }
 
-    // Hemisphere of latitude: 3
-    if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 3, field_buf, FIELD_BUF_SZ)) > 0) {
-        if(field_buf[0] == 'S') {
-            gnss->lat *= -1;
-        }
-    }
+    // // Longitude: 4 DDDMM.MMMMMMM
+    // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 4, field_buf, FIELD_BUF_SZ)) == 13) {
+    //     // gnss->lon = gps_atof(field_buf, field_sz_ret, 0);
+    // }
 
-    // Longitude: 4 DDDMM.MMMMMMM
-    if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 4, field_buf, FIELD_BUF_SZ)) == 13) {
-        // gnss->lon = gps_atof(field_buf, field_sz_ret, 0);
-    }
-
-    // Hemisphere of longitude: 5
-    if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 5, field_buf, FIELD_BUF_SZ)) > 0) {
-        if(field_buf[0] == 'W') {
-            gnss->lon *= -1;
-        }
-    }
+    // // Hemisphere of longitude: 5
+    // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 5, field_buf, FIELD_BUF_SZ)) > 0) {
+    //     if(field_buf[0] == 'W') {
+    //         gnss->lon *= -1;
+    //     }
+    // }
 
     // Position fix indicator: 6
     // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 6, field_buf, FIELD_BUF_SZ)) > 0) {
@@ -329,7 +349,7 @@ static int convert_verify_latlon(
 
     // Process the DD/DDD part:
     for(i = 0; i < ndd; i++) {
-        if(IS_DIGIT(buf[i])) {
+        if(IS_DIGIT(field[i])) {
             digitbuf[i] = field[i];
         } else {
             // Error: invalid character found
@@ -436,7 +456,7 @@ static int convert_verify_date(
     int i, j;
 
     // Pre-checking:
-    if(field == NULL || hour == NULL || minute == NULL || second == NULL) {
+    if(field == NULL || year == NULL || month == NULL || day == NULL) {
         // Error: invalid pointer
         return 0;
     }

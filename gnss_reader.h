@@ -6,6 +6,8 @@
 
 typedef struct {
     uint8_t data_valid;
+    int8_t debug_code;
+    int8_t debug_code2;
 
     int16_t latitude_degree;
     double latitude_minute;

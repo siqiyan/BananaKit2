@@ -152,10 +152,6 @@ int float2str(double value, char *buf, int sz, int precision) {
   return ptr - buf;
 }
 
-// char *float2str_v2(float value, int precision) {
-    
-// }
-
 int str2float(const char *buf, int bufsz, double *output) {
     // https://docs.arduino.cc/language-reference/en/variables/data-types/float/
     // The float data type has only 6-7 decimal digits of precision.
