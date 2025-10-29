@@ -73,45 +73,53 @@ int parse_gnss_data_buf(gnss_reader_t *gnss) {
     }
 
     if(gnss->buf_count < 6) {
+        gnss->debug_code0 = -1;
         return -1;
     }
 
     if(strncmp(gnss->buf, "$GPRMC", 6) == 0) {
         if(parse_gprmc_string(gnss) == 1) {
+            gnss->debug_code0 = 2;
             return 2;
         } else {
+            gnss->debug_code0 = -2;
             return -2;
         }
     } else if(strncmp(gnss->buf, "$GPGGA", 6) == 0) {
         if(parse_gpgga_string(gnss) == 1) {
+            gnss->debug_code0 = 3;
             return 3;
         } else {
+            gnss->debug_code0 = -3;
             return -3;
         }
-    }
-    
-    else if(strncmp(gnss->buf, "$GPVTG", 6) == 0) {
+    } else if(strncmp(gnss->buf, "$GPVTG", 6) == 0) {
 
         // TODO
+        gnss->debug_code0 = -4;
         return -4;
 
     } else if(strncmp(gnss->buf, "$GPGLL", 6) == 0) {
 
         // TODO
+        gnss->debug_code0 = -5;
         return -5;
 
     } else if(strncmp(gnss->buf, "$GPGSV", 6) == 0) {
 
         // TODO
+        gnss->debug_code0 = -6;
         return -6;
 
     }  else if(strncmp(gnss->buf, "$GPGSA", 6) == 0) {
 
         // TODO
+        gnss->debug_code0 = -7;
         return -7;
 
     }
 
+    gnss->debug_code0 = -8;
     return -8;
 }
 
@@ -121,8 +129,6 @@ static int parse_gprmc_string(gnss_reader_t *gnss) {
     int ret_code;
 
     gnss->data_valid = 1;
-    gnss->debug_code = 0;
-    gnss->debug_code2 = 0;
 
     // Hemisphere of latitude
     field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 4, field_buf, FIELD_BUF_SZ);
@@ -131,7 +137,7 @@ static int parse_gprmc_string(gnss_reader_t *gnss) {
     } else {
         gnss->latitude_hemisphere = '\0';
         gnss->data_valid = 0;
-        gnss->debug_code = -1;
+        gnss->debug_code1 = -1;
         return -1;
     }
 
@@ -142,7 +148,7 @@ static int parse_gprmc_string(gnss_reader_t *gnss) {
     } else {
         gnss->longitude_hemisphere = '\0';
         gnss->data_valid = 0;
-        gnss->debug_code = -2;
+        gnss->debug_code1 = -2;
         return -2;
     }
 
@@ -158,13 +164,13 @@ static int parse_gprmc_string(gnss_reader_t *gnss) {
         );
         if(ret_code != 1) {
             gnss->data_valid = 0;
-            gnss->debug_code = -3;
+            gnss->debug_code1 = -3;
             gnss->debug_code2 = ret_code;
             return -3;
         }
     } else {
         gnss->data_valid = 0;
-        gnss->debug_code = -4;
+        gnss->debug_code1 = -4;
         return -4;
     }
 
@@ -180,13 +186,13 @@ static int parse_gprmc_string(gnss_reader_t *gnss) {
         );
         if(ret_code != 1) {
             gnss->data_valid = 0;
-            gnss->debug_code = -5;
+            gnss->debug_code1 = -5;
             gnss->debug_code2 = ret_code;
             return -5;
         }
     } else {
         gnss->data_valid = 0;
-        gnss->debug_code = -6;
+        gnss->debug_code1 = -6;
         return -6;
     }
 
@@ -202,13 +208,13 @@ static int parse_gprmc_string(gnss_reader_t *gnss) {
         );
         if(ret_code != 1) {
             gnss->data_valid = 0;
-            gnss->debug_code = -7;
+            gnss->debug_code1 = -7;
             gnss->debug_code2 = ret_code;
             return -7;
         }
     } else {
         gnss->data_valid = 0;
-        gnss->debug_code = -8;
+        gnss->debug_code1 = -8;
         return -8;
     }
 
@@ -224,13 +230,13 @@ static int parse_gprmc_string(gnss_reader_t *gnss) {
         );
         if(ret_code != 1) {
             gnss->data_valid = 0;
-            gnss->debug_code = -9;
+            gnss->debug_code1 = -9;
             gnss->debug_code2 = ret_code;
             return -9;
         }
     } else {
         gnss->data_valid = 0;
-        gnss->debug_code = -10;
+        gnss->debug_code1 = -10;
         return -10;
     }
 
@@ -243,8 +249,6 @@ static int parse_gpgga_string(gnss_reader_t *gnss) {
     int ret_code;
 
     gnss->data_valid = 1;
-    gnss->debug_code = 0;
-    gnss->debug_code2 = 0;
 
     // UTC time: 1
     field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 1, field_buf, FIELD_BUF_SZ);
@@ -258,13 +262,13 @@ static int parse_gpgga_string(gnss_reader_t *gnss) {
         );
         if(ret_code != 1) {
             gnss->data_valid = 0;
-            gnss->debug_code = -7;
+            gnss->debug_code1 = -7;
             gnss->debug_code2 = ret_code;
             return -7;
         }
     } else {
         gnss->data_valid = 0;
-        gnss->debug_code = -8;
+        gnss->debug_code1 = -8;
         return -8;
     }
 
@@ -280,13 +284,13 @@ static int parse_gpgga_string(gnss_reader_t *gnss) {
         );
         if(ret_code != 1) {
             gnss->data_valid = 0;
-            gnss->debug_code = -3;
+            gnss->debug_code1 = -3;
             gnss->debug_code2 = ret_code;
             return -3;
         }
     } else {
         gnss->data_valid = 0;
-        gnss->debug_code = -4;
+        gnss->debug_code1 = -4;
         return -4;
     }
 
@@ -297,7 +301,7 @@ static int parse_gpgga_string(gnss_reader_t *gnss) {
     } else {
         gnss->latitude_hemisphere = '\0';
         gnss->data_valid = 0;
-        gnss->debug_code = -1;
+        gnss->debug_code1 = -1;
         return -1;
     }
 
@@ -313,13 +317,13 @@ static int parse_gpgga_string(gnss_reader_t *gnss) {
         );
         if(ret_code != 1) {
             gnss->data_valid = 0;
-            gnss->debug_code = -5;
+            gnss->debug_code1 = -5;
             gnss->debug_code2 = ret_code;
             return -5;
         }
     } else {
         gnss->data_valid = 0;
-        gnss->debug_code = -6;
+        gnss->debug_code1 = -6;
         return -6;
     }
 
@@ -330,7 +334,7 @@ static int parse_gpgga_string(gnss_reader_t *gnss) {
     } else {
         gnss->longitude_hemisphere = '\0';
         gnss->data_valid = 0;
-        gnss->debug_code = -2;
+        gnss->debug_code1 = -2;
         return -2;
     }
 
