@@ -51,17 +51,6 @@ node_status_t gps_imu_module_update(void) {
     node_status_t next_status = NODE_RUNNING;
     char c;
     uint8_t nmea_start;
-    int16_t ax, ay, az;
-    int16_t gx, gy, gz;
-
-    // IO.lcd_clear_callback();
-
-    if(IMU_ok) {
-        IMU.getMotion6(
-            &ax, &ay, &az,
-            &gx, &gy, &gz
-        );
-    }
 
     if(GNSS != NULL) {
         GNSS->buf_count = 0;
@@ -211,6 +200,9 @@ static void refresh_gps_display(void) {
 }
 
 static void refresh_imu_display(void) {
+    int16_t ax, ay, az;
+    int16_t gx, gy, gz;
+
     IO.lcd_clear_callback();
     if(!IMU_ok) {
         snprintf(
@@ -222,6 +214,11 @@ static void refresh_imu_display(void) {
         IO.lcd_refresh_callback();
         return;
     }
+
+    IMU.getMotion6(
+        &ax, &ay, &az,
+        &gx, &gy, &gz
+    );
 
     snprintf(
         IO.lcd_buf,
