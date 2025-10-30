@@ -19,7 +19,7 @@ gnss_reader_t *GNSS;
 MPU6050 IMU;
 uint8_t IMU_ok;
 
-#define MAX_PAGES 3
+#define MAX_PAGES 2
 int8_t Page;
 
 
@@ -53,44 +53,10 @@ node_status_t gps_imu_module_update(void) {
     uint8_t nmea_start;
 
     if(GNSS != NULL) {
-        GNSS->buf_count = 0;
-        nmea_start = 0;
-        while(Serial.available() && GNSS->buf_count < GNSS_UART_BUF_SZ - 1) {
-            c = Serial.read();
-            if(c == '$') {
-                nmea_start = 1;
-            }
-            if(!nmea_start) {
-                continue;
-            }
-            GNSS->buf[GNSS->buf_count++] = c;
+        while(Serial.available()) {
+            gnss_update(GNSS, Serial.read());
         }
-        GNSS->buf[GNSS->buf_count] = '\0'; // set nul character
-
-        GNSS->debug_code0 = 0;
-        GNSS->debug_code1 = 0;
-        GNSS->debug_code2 = 0;
-        GNSS->debug_code3 = 0;
-
-        parse_gnss_data_buf(GNSS);
-        GNSS->buf[0] = '\0'; // clear buf after use
     }
-
-    // if(GPS_Serial.available()) {
-    //     char c = GPS_Serial.read();
-    //     Serial.write(c);
-    // }
-
-    // snprintf(
-    //     IO.lcd_buf,
-    //     LCD_BUF_SIZE,
-    //     "wait gps reading"
-    // );
-    // IO.flags = LCD_REFRESH_LINE0;
-    // IO.lcd_refresh_callback();
-    // while(!GPS_Serial.available()) {
-    //     delay(50);
-    // }
 
     if(Page == 0) {
         refresh_gps_display();
@@ -151,52 +117,52 @@ static void refresh_gps_display(void) {
     snprintf(
         IO.lcd_buf,
         LCD_BUF_SIZE,
-        "%d %d %d %d",
+        "%d %d %d %d %d",
         GNSS->debug_code0,
         GNSS->debug_code1,
         GNSS->debug_code2,
-        GNSS->debug_code3
+        GNSS->debug_code3,
+        GNSS->data_valid
     );
     IO.flags = LCD_REFRESH_LINE0;
     IO.lcd_refresh_callback();
 
-    if(GNSS->data_valid) {
-        float2str(GNSS->latitude_minute, floatbuf, FLOAT_BUF_SZ, 5);
-        snprintf(
-            IO.lcd_buf,
-            LCD_BUF_SIZE,
-            "lat:%d %s%c",
-            GNSS->latitude_degree,
-            floatbuf,
-            GNSS->latitude_hemisphere
-        );
-        IO.flags = LCD_REFRESH_LINE1;
-        IO.lcd_refresh_callback();
+    float2str(GNSS->latitude_minute, floatbuf, FLOAT_BUF_SZ, 5);
+    snprintf(
+        IO.lcd_buf,
+        LCD_BUF_SIZE,
+        "lat:%d %s%c",
+        GNSS->latitude_degree,
+        floatbuf,
+        GNSS->latitude_hemisphere
+    );
+    IO.flags = LCD_REFRESH_LINE1;
+    IO.lcd_refresh_callback();
 
-        float2str(GNSS->longitude_minute, floatbuf, FLOAT_BUF_SZ, 5);
-        snprintf(
-            IO.lcd_buf,
-            LCD_BUF_SIZE,
-            "lon:%d %s%c",
-            GNSS->longitude_degree,
-            floatbuf,
-            GNSS->longitude_hemisphere
-        );
-        IO.flags = LCD_REFRESH_LINE2;
-        IO.lcd_refresh_callback();
+    float2str(GNSS->longitude_minute, floatbuf, FLOAT_BUF_SZ, 5);
+    snprintf(
+        IO.lcd_buf,
+        LCD_BUF_SIZE,
+        "lon:%d %s%c",
+        GNSS->longitude_degree,
+        floatbuf,
+        GNSS->longitude_hemisphere
+    );
+    IO.flags = LCD_REFRESH_LINE2;
+    IO.lcd_refresh_callback();
 
-        snprintf(
-            IO.lcd_buf,
-            LCD_BUF_SIZE,
-            "%d %d %d %d",
-            GNSS->utc_hour,
-            GNSS->utc_min,
-            GNSS->year,
-            GNSS->month
-        );
-        IO.flags = LCD_REFRESH_LINE3;
-        IO.lcd_refresh_callback();
-    }
+    snprintf(
+        IO.lcd_buf,
+        LCD_BUF_SIZE,
+        "%d %d %d %d",
+        GNSS->utc_hour,
+        GNSS->utc_min,
+        GNSS->year,
+        GNSS->month
+    );
+    IO.flags = LCD_REFRESH_LINE3;
+    IO.lcd_refresh_callback();
+
 }
 
 static void refresh_imu_display(void) {

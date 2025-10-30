@@ -55,6 +55,12 @@ gnss_reader_t *create_gnss_reader(void) {
     gnss_ptr->buf[0] = '\0';
     gnss_ptr->buf_count = 0;
 
+    gnss_ptr->debug_code0 = 0;
+    gnss_ptr->debug_code1 = 0;
+    gnss_ptr->debug_code2 = 0;
+    gnss_ptr->debug_code3 = 0;
+    gnss_ptr->nmea_started = 0;
+
     return gnss_ptr;
 }
 
@@ -65,6 +71,52 @@ int destroy_gnss_reader(gnss_reader_t *gnss) {
     } else {
         return GNSS_ERR_NUL_PTR;
     }
+}
+
+int gnss_update(gnss_reader_t *gnss, char c) {
+    if(gnss == NULL) {
+        return 0;
+    }
+
+    if(c == '$') {
+
+        if(gnss->nmea_started) {
+            gnss->buf[gnss->buf_count] = '\0';
+            gnss->debug_code0 = 0;
+            gnss->debug_code1 = 0;
+            gnss->debug_code2 = 0;
+            gnss->debug_code3 = 0;
+            parse_gnss_data_buf(gnss);
+        }
+
+        gnss->buf_count = 0;
+        gnss->buf[gnss->buf_count++] = '$';
+        gnss->nmea_started = 1;
+
+    } else {
+
+        if(gnss->buf_count >= GNSS_UART_BUF_SZ - 1) {
+
+            if(gnss->nmea_started) {
+                gnss->buf[gnss->buf_count] = '\0';
+                gnss->debug_code0 = 0;
+                gnss->debug_code1 = 0;
+                gnss->debug_code2 = 0;
+                gnss->debug_code3 = 0;
+                parse_gnss_data_buf(gnss);
+            }
+
+            gnss->buf_count = 0;
+            gnss->buf[0] = '\0';
+            gnss->nmea_started = 0;
+            
+        }
+
+        gnss->buf[gnss->buf_count++] = c;
+
+    }
+
+    return 1;
 }
 
 int parse_gnss_data_buf(gnss_reader_t *gnss) {
@@ -95,25 +147,21 @@ int parse_gnss_data_buf(gnss_reader_t *gnss) {
         }
     } else if(strncmp(gnss->buf, "$GPVTG", 6) == 0) {
 
-        // TODO
         gnss->debug_code0 = -4;
         return -4;
 
     } else if(strncmp(gnss->buf, "$GPGLL", 6) == 0) {
 
-        // TODO
         gnss->debug_code0 = -5;
         return -5;
 
     } else if(strncmp(gnss->buf, "$GPGSV", 6) == 0) {
 
-        // TODO
         gnss->debug_code0 = -6;
         return -6;
 
     }  else if(strncmp(gnss->buf, "$GPGSA", 6) == 0) {
 
-        // TODO
         gnss->debug_code0 = -7;
         return -7;
 
@@ -124,6 +172,8 @@ int parse_gnss_data_buf(gnss_reader_t *gnss) {
 }
 
 static int parse_gprmc_string(gnss_reader_t *gnss) {
+    // Parse Recommended Minimum Specific (RMC) GNSS data
+
     char field_buf[FIELD_BUF_SZ];
     int field_sz;
     int ret_code;
@@ -244,6 +294,9 @@ static int parse_gprmc_string(gnss_reader_t *gnss) {
 }
 
 static int parse_gpgga_string(gnss_reader_t *gnss) {
+    // Parse Global Positioning System Fixed Data:
+    // (Not sure why it called GPGGA)
+
     char field_buf[FIELD_BUF_SZ];
     int field_sz;
     int ret_code;

@@ -27,6 +27,7 @@ typedef struct {
     int8_t month;
     int16_t day;
 
+    uint8_t nmea_started;
     char buf[GNSS_UART_BUF_SZ];
     int16_t buf_count;
 } gnss_reader_t;
@@ -45,5 +46,6 @@ typedef struct {
 gnss_reader_t *create_gnss_reader(void);
 int destroy_gnss_reader(gnss_reader_t *gnss);
 int parse_gnss_data_buf(gnss_reader_t *gnss);
+int gnss_update(gnss_reader_t *gnss, char c);
 
 #endif
