@@ -1,6 +1,5 @@
 #include <string.h>
 #include <stdlib.h>
-#include <MPU6050.h>
 
 #include "bananakit.h"
 #include "callstack.h"
@@ -9,6 +8,7 @@
 #include "bananakit_misc.h"
 #include "gps_imu_module.h"
 #include "gnss_reader.h"
+#include "imu_reader.h"
 
 #define FLOAT_BUF_SZ 16
 
@@ -16,8 +16,7 @@ extern callstack_t Callstack;
 extern bananakit_io_t IO;
 
 gnss_reader_t *GNSS;
-MPU6050 IMU;
-uint8_t IMU_ok;
+imu_reader_t *IMU;
 
 #define MAX_PAGES 2
 int8_t Page;
@@ -31,19 +30,8 @@ void gps_imu_module_init(void) {
     GNSS = create_gnss_reader();
     Serial.begin(9600);
 
-    IMU.initialize();
-    if(IMU.testConnection() == false) {
-        IMU_ok = 0;
-    } else {
-        IMU_ok = 1;
-        IMU.setXAccelOffset(0); //Set your accelerometer offset for axis X
-        IMU.setYAccelOffset(0); //Set your accelerometer offset for axis Y
-        IMU.setZAccelOffset(0); //Set your accelerometer offset for axis Z
-        IMU.setXGyroOffset(0);  //Set your gyro offset for axis X
-        IMU.setYGyroOffset(0);  //Set your gyro offset for axis Y
-        IMU.setZGyroOffset(0);  //Set your gyro offset for axis Z
-    }
-
+    IMU = create_imu_reader();
+    
     Page = 0;
 }
 
@@ -56,6 +44,10 @@ node_status_t gps_imu_module_update(void) {
         while(Serial.available()) {
             gnss_update(GNSS, Serial.read());
         }
+    }
+
+    if(IMU != NULL && IMU->dmp_ready) {
+        imu_update(IMU);
     }
 
     if(Page == 0) {
@@ -83,7 +75,7 @@ node_status_t gps_imu_module_update(void) {
             break;
     }
 
-    delay(50);
+    delay(100);
 
     return next_status;
 }
@@ -93,7 +85,10 @@ void gps_imu_module_resume(void) {
 
 void gps_imu_module_exit(void) {
     destroy_gnss_reader(GNSS);
+    GNSS = NULL;
     Serial.end();
+    destroy_imu_reader(IMU);
+    IMU = NULL;
 }
 
 //////////////////////////////////
@@ -166,41 +161,48 @@ static void refresh_gps_display(void) {
 }
 
 static void refresh_imu_display(void) {
-    int16_t ax, ay, az;
-    int16_t gx, gy, gz;
+    char floatbuf[FLOAT_BUF_SZ];
 
-    IO.lcd_clear_callback();
-    if(!IMU_ok) {
+    if(IMU == NULL || (!IMU->dmp_ready)) {
         snprintf(
             IO.lcd_buf,
             LCD_BUF_SIZE,
-            "IMU init fail"
+            "IMU init err"
         );
         IO.flags = LCD_REFRESH_LINE0;
         IO.lcd_refresh_callback();
         return;
     }
 
-    IMU.getMotion6(
-        &ax, &ay, &az,
-        &gx, &gy, &gz
-    );
+    IO.lcd_clear_callback();
 
+    float2str(IMU->ypr[0] * RAD_TO_DEG, floatbuf, FLOAT_BUF_SZ, 2);
     snprintf(
         IO.lcd_buf,
         LCD_BUF_SIZE,
-        "%d %d %d",
-        ax, ay, az
+        "yaw:%s",
+        floatbuf
     );
     IO.flags = LCD_REFRESH_LINE0;
     IO.lcd_refresh_callback();
 
+    float2str(IMU->ypr[1] * RAD_TO_DEG, floatbuf, FLOAT_BUF_SZ, 2);
     snprintf(
         IO.lcd_buf,
         LCD_BUF_SIZE,
-        "%d %d %d",
-        gx, gy, gz
+        "pitch:%s",
+        floatbuf
     );
     IO.flags = LCD_REFRESH_LINE1;
+    IO.lcd_refresh_callback();
+
+    float2str(IMU->ypr[2] * RAD_TO_DEG, floatbuf, FLOAT_BUF_SZ, 2);
+    snprintf(
+        IO.lcd_buf,
+        LCD_BUF_SIZE,
+        "roll:%s",
+        floatbuf
+    );
+    IO.flags = LCD_REFRESH_LINE2;
     IO.lcd_refresh_callback();
 }
