@@ -86,70 +86,71 @@ int bytes2hex_str(uint8_t *input, int input_len, char *output, int output_limit)
 }
 
 int float2str(double value, char *buf, int sz, int precision) {
-  // Convert a float number into string for displaying.
-  // Inputs:
-  //    value - input float number
-  //    buf - pointer to output buffer
-  //    sz - output buffer size (TODO)
-  //    precision - required number of decimals
-  // Outputs:
-  //    Return the number of bytes in the output buffer
+    // Convert a float number into string for displaying.
+    // Inputs:
+    //    value - input float number
+    //    buf - pointer to output buffer
+    //    sz - output buffer size (TODO)
+    //    precision - required number of decimals
+    // Outputs:
+    //    Return the number of bytes in the output buffer
 
-  // Warning:
-  // The input buf size must be sufficient large since this function does not
-  // check for space availability.
+    // Warning:
+    // The input buf size must be sufficient large since this function does not
+    // check for space availability.
 
-  char *ptr = buf;
-  int ivalue; // for integer part of the input value
-  double fvalue; // float point part
-  int idigit; // for counting digits
-  int fmulti;
+    char *ptr = buf;
+    int ivalue;         // for integer part of the input value
+    double fvalue;      // float point part
+    int digits;         // for counting digits
+    int fmulti;
+    int i;
 
-  // Count how many digits integer part has:
-  ivalue = (int) value;
-  idigit = 0;
-  while(ivalue > 0) {
-    idigit++;
-    ivalue /= 10;
-  }
-
-  // Put a minus sign for negative number:
-  if(value < 0) {
-    *ptr++ = '-';
-  }
-
-  if(idigit == 0) {
-    // Put a zero if no integer part:
-    *ptr++ = '0';
-  } else {
-    // Convert all digits from integer part (reverse the loop since lowest
-    // digit go first):
-    ivalue = (int) value;
-    for(int i = idigit - 1; i >= 0; i--) {
-      *(ptr + i) = (abs(ivalue) % 10) + '0';
-      ivalue /= 10;
+    // Count how many digits integer part has:
+    ivalue = abs((int) value);
+    digits = 0;
+    while(ivalue > 0) {
+        digits++;
+        ivalue /= 10;
     }
-    ptr += idigit; // pointer move to the next available byte
-  }
 
-  *ptr++ = '.'; // put a dot for decimal digits
+    // Put a minus sign for negative number:
+    if(value < 0) {
+        *ptr++ = '-';
+    }
 
-  // Convert all float point digits to string for given precision:
-  if(value < 0) {
-    fvalue = -value;
-  } else {
-    fvalue = value;
-  }
-  fmulti = 1;
-  for(int i = 0; i < precision; i++) {
-    fmulti *= 10;
-    // fvalue *= 10;
-    *ptr++ = abs((int) (fvalue * (double) fmulti)) % 10 + '0';
-  }
+    if(digits == 0) {
+        // Put a zero if no integer part:
+        *ptr++ = '0';
+    } else {
+        // Convert all digits from integer part (reverse the loop since lowest
+        // digit go first):
+        ivalue = abs((int) value);
+        for(i = digits - 1; i >= 0; i--) {
+            ptr[i] = TO_ASCII((abs(ivalue) % 10));
+            ivalue /= 10;
+        }
+        ptr += digits; // pointer move to the next available byte
+    }
 
-  *ptr++ = '\0'; // Put the termination mark at the end of buffer
+    *ptr++ = '.'; // put a dot for decimal digits
 
-  return ptr - buf;
+    // Convert all float point digits to string for given precision:
+    if(value < 0) {
+        fvalue = -value;
+    } else {
+        fvalue = value;
+    }
+    fmulti = 1;
+    for(i = 0; i < precision; i++) {
+        fmulti *= 10;
+        // fvalue *= 10;
+        *ptr++ = TO_ASCII(abs((int) (fvalue * (double) fmulti)) % 10);
+    }
+
+    *ptr++ = '\0'; // Put the termination mark at the end of buffer
+
+    return ptr - buf;
 }
 
 int str2float(const char *buf, int bufsz, double *output) {
