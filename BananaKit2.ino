@@ -1,5 +1,8 @@
 #include <stdio.h>
 #include <util/atomic.h>
+#include <LiquidCrystal_I2C.h>
+#include <Wire.h>
+#include <IRremote.h>
 
 #include "bananakit.h"
 #include "callstack.h"

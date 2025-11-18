@@ -5,6 +5,7 @@
 #include "callstack.h"
 #include "menu.h"
 #include "bananakit_io.h"
+#include "banana_string.h"
 #include "bananakit_misc.h"
 #include "gps_imu_module.h"
 #include "gnss_reader.h"

@@ -4,14 +4,11 @@
 ///////////////////////////////////////////////////////////////
 // Built-in modules:
 // 2004 LCD I2C module:
-#include <LiquidCrystal_I2C.h>
-#include <Wire.h>
 #define LCD_ADDR 0x27
 #define LCD_HEIGHT 4 // lcd screen height
 #define LCD_WIDTH 20 // lcd screen width
 
 // IR receiver:
-#include <IRremote.h>
 #define IR_SENSOR_PIN 2
 // Primary IR Controller (PIC) Keypress:
 #define PIC_POWER   0xFFA25D
@@ -39,7 +36,6 @@
 // Built-in potentiometer:
 #define VOLT0_READ_PIN  A0
 ///////////////////////////////////////////////////////////////
-
 
 ///////////////////////////////////////////////////////////////
 // Removable modules:

@@ -1,7 +1,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "bananakit_misc.h"
+#include "banana_string.h"
 #include "gnss_reader.h"
 
 #define FIELD_BUF_SZ 16

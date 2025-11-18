@@ -8,6 +8,7 @@
 #include "menu.h"
 #include "bananakit_io.h"
 #include "bananakit_misc.h"
+#include "banana_string.h"
 #include "rc_station.h"
 #include "rc_vehicle_common.h"
 

@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <fs_thin.h>
+#include <Arduino.h>
 #include <EEPROM.h>
 
 #include "bananakit.h"
@@ -10,6 +11,7 @@
 #include "radio_module.h"
 #include "radio.h"
 #include "signal_process.h"
+#include "banana_string.h"
 
 
 extern callstack_t Callstack;
