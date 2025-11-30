@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
 
 #include "banana_string.h"
 #include "gnss_reader.h"
@@ -9,27 +10,9 @@
 
 static int parse_gprmc_string(gnss_reader_t *gnss);
 static int parse_gpgga_string(gnss_reader_t *gnss);
-static int convert_verify_latlon(
-    const char *field,
-    int n,
-    int ndd,
-    int16_t *degree,
-    double *minute
-);
-static int convert_verify_utc_time(
-    const char *field,
-    int n,
-    int8_t *hour,
-    int8_t *minute,
-    double *second
-);
-static int convert_verify_date(
-    const char *field,
-    int n,
-    int16_t *year,
-    int8_t *month,
-    int16_t *day
-);
+static int convert_verify_latlon(const char *field, int n, int ndd, int16_t *degree, double *minute);
+static int convert_verify_utc_time(const char *field, int n, int8_t *hour, int8_t *minute, double *second);
+static int convert_verify_date(const char *field, int n, int16_t *year, int8_t *month, int16_t *day);
 
 gnss_reader_t *create_gnss_reader(void) {
     gnss_reader_t *gnss_ptr;
@@ -39,37 +22,32 @@ gnss_reader_t *create_gnss_reader(void) {
         return NULL;
     }
 
-    gnss_ptr->data_valid = 0;
-    gnss_ptr->latitude_degree = 0;
-    gnss_ptr->latitude_minute = 0.0;
-    gnss_ptr->latitude_hemisphere = '\0';
-    gnss_ptr->longitude_degree = 0;
-    gnss_ptr->longitude_minute = 0.0;
-    gnss_ptr->longitude_hemisphere = '\0';
-    gnss_ptr->utc_hour = 0;
-    gnss_ptr->utc_min = 0;
-    gnss_ptr->utc_sec = 0.0;
-    gnss_ptr->year = 0;
-    gnss_ptr->month = 0;
-    gnss_ptr->day = 0;
+    // gnss_ptr->data_valid = 0;
+    gnss_ptr->status.data_valid         = 0;
+    gnss_ptr->status.data_initialized   = 0;
+    gnss_ptr->status.nmea_started       = 0;
+    gnss_ptr->status.origin_initialized = 0;
+    // gnss_ptr->utc_hour = 0;
+    // gnss_ptr->utc_min = 0;
+    // gnss_ptr->utc_sec = 0.0;
+    // gnss_ptr->year = 0;
+    // gnss_ptr->month = 0;
+    // gnss_ptr->day = 0;
     gnss_ptr->buf[0] = '\0';
     gnss_ptr->buf_count = 0;
-
     gnss_ptr->debug_code0 = 0;
     gnss_ptr->debug_code1 = 0;
     gnss_ptr->debug_code2 = 0;
     gnss_ptr->debug_code3 = 0;
-    gnss_ptr->nmea_started = 0;
-
     return gnss_ptr;
 }
 
 int destroy_gnss_reader(gnss_reader_t *gnss) {
     if(gnss != NULL) {
         free(gnss);
-        return GNSS_SUCCESS;
+        return 1;
     } else {
-        return GNSS_ERR_NUL_PTR;
+        return 0;
     }
 }
 
@@ -80,7 +58,7 @@ int gnss_update(gnss_reader_t *gnss, char c) {
 
     if(c == '$') {
 
-        if(gnss->nmea_started) {
+        if(gnss->status.nmea_started) {
             gnss->buf[gnss->buf_count] = '\0';
             gnss->debug_code0 = 0;
             gnss->debug_code1 = 0;
@@ -91,13 +69,13 @@ int gnss_update(gnss_reader_t *gnss, char c) {
 
         gnss->buf_count = 0;
         gnss->buf[gnss->buf_count++] = '$';
-        gnss->nmea_started = 1;
+        gnss->status.nmea_started = 1;
 
     } else {
 
         if(gnss->buf_count >= GNSS_UART_BUF_SZ - 1) {
 
-            if(gnss->nmea_started) {
+            if(gnss->status.nmea_started) {
                 gnss->buf[gnss->buf_count] = '\0';
                 gnss->debug_code0 = 0;
                 gnss->debug_code1 = 0;
@@ -108,7 +86,7 @@ int gnss_update(gnss_reader_t *gnss, char c) {
 
             gnss->buf_count = 0;
             gnss->buf[0] = '\0';
-            gnss->nmea_started = 0;
+            gnss->status.nmea_started = 0;
             
         }
 
@@ -145,27 +123,22 @@ int parse_gnss_data_buf(gnss_reader_t *gnss) {
             gnss->debug_code0 = -3;
             return -3;
         }
-    } else if(strncmp(gnss->buf, "$GPVTG", 6) == 0) {
-
-        gnss->debug_code0 = -4;
-        return -4;
-
-    } else if(strncmp(gnss->buf, "$GPGLL", 6) == 0) {
-
-        gnss->debug_code0 = -5;
-        return -5;
-
-    } else if(strncmp(gnss->buf, "$GPGSV", 6) == 0) {
-
-        gnss->debug_code0 = -6;
-        return -6;
-
-    }  else if(strncmp(gnss->buf, "$GPGSA", 6) == 0) {
-
-        gnss->debug_code0 = -7;
-        return -7;
-
     }
+    
+    // Reserved for parsing other NMEA setences:
+    // else if(strncmp(gnss->buf, "$GPVTG", 6) == 0) {
+    //     gnss->debug_code0 = -4;
+    //     return -4;
+    // } else if(strncmp(gnss->buf, "$GPGLL", 6) == 0) {
+    //     gnss->debug_code0 = -5;
+    //     return -5;
+    // } else if(strncmp(gnss->buf, "$GPGSV", 6) == 0) {
+    //     gnss->debug_code0 = -6;
+    //     return -6;
+    // }  else if(strncmp(gnss->buf, "$GPGSA", 6) == 0) {
+    //     gnss->debug_code0 = -7;
+    //     return -7;
+    // }
 
     gnss->debug_code0 = -8;
     return -8;
@@ -178,15 +151,14 @@ static int parse_gprmc_string(gnss_reader_t *gnss) {
     int field_sz;
     int ret_code;
 
-    gnss->data_valid = 1;
+    gnss->status.data_valid = 1;
 
     // Hemisphere of latitude
     field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 4, field_buf, FIELD_BUF_SZ);
     if((field_sz) > 0) {
-        gnss->latitude_hemisphere = field_buf[0];
+        gnss->status.data_valid = set_hemisphere(&gnss->lat, field_buf[0], 1);
     } else {
-        gnss->latitude_hemisphere = '\0';
-        gnss->data_valid = 0;
+        gnss->status.data_valid = 0;
         gnss->debug_code1 = -1;
         return -1;
     }
@@ -194,10 +166,9 @@ static int parse_gprmc_string(gnss_reader_t *gnss) {
     // Hemisphere of longitude
     field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 6, field_buf, FIELD_BUF_SZ);
     if(field_sz > 0) {
-        gnss->longitude_hemisphere = field_buf[0];
+        gnss->status.data_valid = set_hemisphere(&gnss->lon, field_buf[0], 0);
     } else {
-        gnss->longitude_hemisphere = '\0';
-        gnss->data_valid = 0;
+        gnss->status.data_valid = 0;
         gnss->debug_code1 = -2;
         return -2;
     }
@@ -205,21 +176,15 @@ static int parse_gprmc_string(gnss_reader_t *gnss) {
     // Latitude: 3 DDMM.MMMMMMM
     field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 3, field_buf, FIELD_BUF_SZ);
     if(field_sz >= 7) {
-        ret_code = convert_verify_latlon(
-            field_buf,
-            field_sz,
-            2,
-            &gnss->latitude_degree,
-            &gnss->latitude_minute
-        );
+        ret_code = convert_verify_latlon(field_buf, field_sz, 2, &gnss->lat.degree, &gnss->lat.minute);
         if(ret_code != 1) {
-            gnss->data_valid = 0;
+            gnss->status.data_valid = 0;
             gnss->debug_code1 = -3;
             gnss->debug_code2 = ret_code;
             return -3;
         }
     } else {
-        gnss->data_valid = 0;
+        gnss->status.data_valid = 0;
         gnss->debug_code1 = -4;
         return -4;
     }
@@ -227,21 +192,15 @@ static int parse_gprmc_string(gnss_reader_t *gnss) {
     // Longitude: 5 DDDMM.MMMMMMM
     field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 5, field_buf, FIELD_BUF_SZ);
     if(field_sz >= 8) {
-        ret_code = convert_verify_latlon(
-            field_buf,
-            field_sz,
-            3,
-            &gnss->longitude_degree,
-            &gnss->longitude_minute
-        );
+        ret_code = convert_verify_latlon(field_buf, field_sz, 3, &gnss->lon.degree, &gnss->lon.minute);
         if(ret_code != 1) {
-            gnss->data_valid = 0;
+            gnss->status.data_valid = 0;
             gnss->debug_code1 = -5;
             gnss->debug_code2 = ret_code;
             return -5;
         }
     } else {
-        gnss->data_valid = 0;
+        gnss->status.data_valid = 0;
         gnss->debug_code1 = -6;
         return -6;
     }
@@ -257,13 +216,13 @@ static int parse_gprmc_string(gnss_reader_t *gnss) {
             &gnss->utc_sec
         );
         if(ret_code != 1) {
-            gnss->data_valid = 0;
+            gnss->status.data_valid = 0;
             gnss->debug_code1 = -7;
             gnss->debug_code2 = ret_code;
             return -7;
         }
     } else {
-        gnss->data_valid = 0;
+        gnss->status.data_valid = 0;
         gnss->debug_code1 = -8;
         return -8;
     }
@@ -279,13 +238,13 @@ static int parse_gprmc_string(gnss_reader_t *gnss) {
             &gnss->day
         );
         if(ret_code != 1) {
-            gnss->data_valid = 0;
+            gnss->status.data_valid = 0;
             gnss->debug_code1 = -9;
             gnss->debug_code2 = ret_code;
             return -9;
         }
     } else {
-        gnss->data_valid = 0;
+        gnss->status.data_valid = 0;
         gnss->debug_code1 = -10;
         return -10;
     }
@@ -301,7 +260,7 @@ static int parse_gpgga_string(gnss_reader_t *gnss) {
     int field_sz;
     int ret_code;
 
-    gnss->data_valid = 1;
+    gnss->status.data_valid = 1;
 
     // UTC time: 1
     field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 1, field_buf, FIELD_BUF_SZ);
@@ -314,13 +273,13 @@ static int parse_gpgga_string(gnss_reader_t *gnss) {
             &gnss->utc_sec
         );
         if(ret_code != 1) {
-            gnss->data_valid = 0;
+            gnss->status.data_valid = 0;
             gnss->debug_code1 = -7;
             gnss->debug_code2 = ret_code;
             return -7;
         }
     } else {
-        gnss->data_valid = 0;
+        gnss->status.data_valid = 0;
         gnss->debug_code1 = -8;
         return -8;
     }
@@ -328,21 +287,15 @@ static int parse_gpgga_string(gnss_reader_t *gnss) {
     // Latitude: 2
     field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 2, field_buf, FIELD_BUF_SZ);
     if(field_sz >= 7) {
-        ret_code = convert_verify_latlon(
-            field_buf,
-            field_sz,
-            2,
-            &gnss->latitude_degree,
-            &gnss->latitude_minute
-        );
+        ret_code = convert_verify_latlon(field_buf, field_sz, 2, &gnss->lat.degree, &gnss->lat.minute);
         if(ret_code != 1) {
-            gnss->data_valid = 0;
+            gnss->status.data_valid = 0;
             gnss->debug_code1 = -3;
             gnss->debug_code2 = ret_code;
             return -3;
         }
     } else {
-        gnss->data_valid = 0;
+        gnss->status.data_valid = 0;
         gnss->debug_code1 = -4;
         return -4;
     }
@@ -350,10 +303,9 @@ static int parse_gpgga_string(gnss_reader_t *gnss) {
     // Hemisphere of latitude: 3
     field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 3, field_buf, FIELD_BUF_SZ);
     if((field_sz) > 0) {
-        gnss->latitude_hemisphere = field_buf[0];
+        gnss->status.data_valid = set_hemisphere(&gnss->lat, field_buf[0], 1);
     } else {
-        gnss->latitude_hemisphere = '\0';
-        gnss->data_valid = 0;
+        gnss->status.data_valid = 0;
         gnss->debug_code1 = -1;
         return -1;
     }
@@ -361,21 +313,15 @@ static int parse_gpgga_string(gnss_reader_t *gnss) {
     // Longitude: 4 DDDMM.MMMMMMM
     field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 4, field_buf, FIELD_BUF_SZ);
     if(field_sz >= 8) {
-        ret_code = convert_verify_latlon(
-            field_buf,
-            field_sz,
-            3,
-            &gnss->longitude_degree,
-            &gnss->longitude_minute
-        );
+        ret_code = convert_verify_latlon(field_buf, field_sz, 3, &gnss->lon.degree, &gnss->lon.minute);
         if(ret_code != 1) {
-            gnss->data_valid = 0;
+            gnss->status.data_valid = 0;
             gnss->debug_code1 = -5;
             gnss->debug_code2 = ret_code;
             return -5;
         }
     } else {
-        gnss->data_valid = 0;
+        gnss->status.data_valid = 0;
         gnss->debug_code1 = -6;
         return -6;
     }
@@ -383,10 +329,10 @@ static int parse_gpgga_string(gnss_reader_t *gnss) {
     // Hemisphere of longitude: 5
     field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 5, field_buf, FIELD_BUF_SZ);
     if(field_sz > 0) {
-        gnss->longitude_hemisphere = field_buf[0];
+        gnss->status.data_valid = set_hemisphere(&gnss->lon, field_buf[0], 0);
     } else {
-        gnss->longitude_hemisphere = '\0';
-        gnss->data_valid = 0;
+        // gnss->longitude_hemisphere = '\0';
+        gnss->status.data_valid = 0;
         gnss->debug_code1 = -2;
         return -2;
     }
@@ -394,39 +340,30 @@ static int parse_gpgga_string(gnss_reader_t *gnss) {
     // Position fix indicator: 6
     // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 6, field_buf, FIELD_BUF_SZ)) > 0) {
     // }
-
     // Sat used: 7
     // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 7, field_buf, FIELD_BUF_SZ)) > 0) {
     // }
-
     // hdop: 8
     // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 8, field_buf, FIELD_BUF_SZ)) > 0) {
     // }
-
     // msl altitude: 9
     // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 9, field_buf, FIELD_BUF_SZ)) > 0) {
     // }
-
     // units: 10
     // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 10, field_buf, FIELD_BUF_SZ)) > 0) {
     // }
-
     // geoid seperation: 11
     // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 11, field_buf, FIELD_BUF_SZ)) > 0) {
     // }
-
     // unit: 12
     // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 12, field_buf, FIELD_BUF_SZ)) > 0) {
     // }
-
     // age of diff corr: 13
     // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 13, field_buf, FIELD_BUF_SZ)) > 0) {
     // }
-
     // diff ref station id: 14
     // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 14, field_buf, FIELD_BUF_SZ)) > 0) {
     // }
-
     // checksum: 15
     // if((field_sz_ret = field_extract(gnss->buf, gnss->buf_count, ',', 15, field_buf, FIELD_BUF_SZ)) > 0) {
     // }
@@ -498,13 +435,7 @@ static int convert_verify_latlon(
 
 #define IDX_MINUTE 2
 #define IDX_SECOND 4
-static int convert_verify_utc_time(
-    const char *field,
-    int n,
-    int8_t *hour,
-    int8_t *minute,
-    double *second
-) {
+static int convert_verify_utc_time(const char *field, int n, int8_t *hour, int8_t *minute, double *second) {
     char digitbuf[DIGIT_BUF_SZ];
     int i, j;
 
@@ -556,13 +487,6 @@ static int convert_verify_utc_time(
     *second = atof(digitbuf);
 
     return 1; // Success
-
-    // strncpy(hh, p, 2);
-    // strncpy(mm, p+2, 2);
-    // strncpy(ss, p+4, 5);
-    // gnss->utc_hour = atoi(hh);
-    // gnss->utc_min = atoi(mm);
-    // gnss->utc_sec  = atof(ss);
 }
 
 #define IDX_MONTH 2
@@ -625,11 +549,87 @@ static int convert_verify_date(
     *year = atoi(digitbuf) + 2000;
 
     return 1; // Success
+}
 
-    // strncpy(dd, p, 2);
-    // strncpy(mo, p+2, 2);
-    // strncpy(yy, p+4, 2);
-    // gnss->day = atoi(dd);
-    // gnss->month = atoi(mo);
-    // gnss->year = 2000 + atoi(yy);
+int set_origin(gnss_reader_t *gnss) {
+    // Modified from Gemini generated code
+
+    if(gnss->status.data_valid) {
+        gnss->origin_lat = gnss->lat;
+        gnss->origin_lon = gnss->lon;
+
+        // Calculate total decimal latitude for the cosine calculation only
+        // We only do this ONCE to save processing power
+        gnss->ref_lat_dec = gnss->origin_lat.degree + (gnss->origin_lat.minute / 60.0);
+
+        // Pre-calculate the longitude scaling factor based on current latitude
+        // conversion: degrees to radians for cos function
+        gnss->meters_per_deg_lon = METERS_PER_DEGREE_LAT * cos(gnss->ref_lat_dec * M_PI / 180.0);
+
+        gnss->status.origin_initialized = 1;
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+int getLocalXY(const gnss_reader_t *gnss, double *x, double *y) {
+    // Modified from Gemini generated code
+
+    if((!gnss->status.origin_initialized) || (!gnss->status.data_valid)) {
+        return 0;
+    }
+
+    // 1. Calculate the difference in DEGREES
+    int16_t deg_diff_lat = gnss->lat.degree - gnss->origin_lat.degree;
+    int16_t deg_diff_lon = gnss->lon.degree - gnss->origin_lon.degree;
+
+    // 2. Calculate the difference in MINUTES
+    double min_diff_lat = gnss->lat.minute - gnss->origin_lat.minute;
+    double min_diff_lon = gnss->lon.minute - gnss->origin_lon.minute;
+
+    // 3. Combine them into a single "Delta Degree" float
+    // This number is SMALL, so we don't lose precision
+    double total_delta_lat = deg_diff_lat + (min_diff_lat / 60.0);
+    double total_delta_lon = deg_diff_lon + (min_diff_lon / 60.0);
+
+    // 4. Convert to Meters (Local X, Y)
+    // Y is North-South, X is East-West
+    *y = total_delta_lat * METERS_PER_DEGREE_LAT;
+    *x = total_delta_lon * gnss->meters_per_deg_lon;
+
+    return 1;
+}
+
+int set_hemisphere(geo_coordinate *coord, char letter, int8_t is_lat) {
+    // To help clarify the hemisphere letters and sign of geo coordinate.
+    // According to Gemini:
+    // The standard convention used in GPS, WGS84, and almost all digital navigation systems is:
+    // The Standard Sign Convention
+    // Latitude (North/South):
+    // North (+): Positive (e.g., New York is +40)
+    // South (−): Negative (e.g., Sydney is -33)
+    // Longitude (East/West):
+    // East (+): Positive (e.g., Tokyo is +139)
+    // West (−): Negative (e.g., Los Angeles is -118)
+    if(is_lat) {
+        // Latitude
+        if(letter == 'N' || letter == 'n') {
+            coord->sign = 1;
+        } else if(letter == 'S' || letter == 's') {
+            coord->sign = -1;
+        } else {
+            coord->sign = 0; // error
+        }
+    } else {
+        // Longitude
+        if(letter == 'E' || letter == 'e') {
+            coord->sign = 1;
+        } else if(letter == 'S' || letter == 's') {
+            coord->sign = -1;
+        } else {
+            coord->sign = 0; // error
+        }
+    }
+    return coord->sign != 0;
 }

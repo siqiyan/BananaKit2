@@ -26,8 +26,12 @@
 #include "rc_station.h"
 #endif
 
-#ifdef ENABLE_GPS_IMU_MODULE
-#include "gps_imu_module.h"
+#ifdef ENABLE_GPS_MODULE
+#include "gps_module.h"
+#endif
+
+#ifdef ENABLE_IMU_MODULE
+#include "imu_module.h"
 #endif
 
 LiquidCrystal_I2C Lcd(LCD_ADDR, LCD_WIDTH, LCD_HEIGHT);
@@ -107,13 +111,24 @@ void setup(void) {
     );
 #endif
 
-#ifdef ENABLE_GPS_IMU_MODULE
+#ifdef ENABLE_GPS_MODULE
     register_new_node(
-        "gps imu",
-        gps_imu_module_init,
-        gps_imu_module_update,
-        gps_imu_module_resume,
-        gps_imu_module_exit,
+        "gps",
+        gps_module_init,
+        gps_module_update,
+        gps_module_resume,
+        gps_module_exit,
+        Main_menu
+    );
+#endif
+
+#ifdef ENABLE_IMU_MODULE
+    register_new_node(
+        "imu",
+        imu_module_init,
+        imu_module_update,
+        imu_module_resume,
+        imu_module_exit,
         Main_menu
     );
 #endif

@@ -67,7 +67,8 @@
 // #define ENABLE_RC_STATION
 // #define ENABLE_MICROSD_MODULE
 // #define ENABLE_JOYSTICK_MODULE
-#define ENABLE_GPS_IMU_MODULE
+#define ENABLE_GPS_MODULE
+// #define ENABLE_IMU_MODULE
 
 // Interruption:
 #define ENABLE_INT1
