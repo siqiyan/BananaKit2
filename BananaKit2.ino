@@ -14,9 +14,9 @@
     #include "radio_module.h"
 #endif
 
-// #ifdef ENABLE_MICROSD_MODULE
-//     #include <SD.h>
-// #endif
+#ifdef ENABLE_MICROSD_MODULE
+    #include "microsd_module.h"
+#endif
 
 #ifdef ENABLE_JOYSTICK_MODULE
 #include "joystick_module.h"
@@ -85,6 +85,17 @@ void setup(void) {
         radio_module_update,
         radio_module_resume,
         radio_module_exit,
+        Main_menu
+    );
+#endif
+
+#ifdef ENABLE_MICROSD_MODULE
+    register_new_node(
+        "microSD",
+        microsd_module_init,
+        microsd_module_update,
+        microsd_module_resume,
+        microsd_module_exit,
         Main_menu
     );
 #endif
@@ -243,6 +254,7 @@ void lcd_clear(void) {
 static void main_menu_flush(void) {
     node_t *node;
 
+    lcd_clear();
     snprintf(
         IO.lcd_buf,
         LCD_BUF_SIZE,
