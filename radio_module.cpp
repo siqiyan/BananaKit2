@@ -1,9 +1,10 @@
+#include "bananakit.h"
+#ifdef ENABLE_RADIO_MODULE
+
 #include <stdio.h>
 #include <fs_thin.h>
 #include <Arduino.h>
 #include <EEPROM.h>
-
-#include "bananakit.h"
 #include "callstack.h"
 #include "menu.h"
 #include "bananakit_io.h"
@@ -710,3 +711,5 @@ static void do_delete_record(void) {
     IO.flags = LCD_REFRESH_LINE1;
     IO.lcd_refresh_callback();
 }
+
+#endif

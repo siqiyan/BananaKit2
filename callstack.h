@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #define NODE_NAME_SZ 16 // Max size for a node name
-#define CALLSTACK_SZ 32 // Max calls allowed per stack
+#define CALLSTACK_SZ 8 // Max calls allowed per stack
 
 typedef enum __node_status__{
     NODE_STARTING,

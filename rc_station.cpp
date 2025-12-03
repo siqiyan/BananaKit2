@@ -1,9 +1,10 @@
+#include "bananakit.h"
+#ifdef ENABLE_RC_STATION
+
 #include <stdlib.h>
 #include <stdint.h>
 #include <Arduino.h>
 #include <util/atomic.h>
-
-#include "bananakit.h"
 #include "callstack.h"
 #include "menu.h"
 #include "bananakit_io.h"
@@ -11,7 +12,6 @@
 #include "banana_string.h"
 #include "rc_station.h"
 #include "rc_vehicle_common.h"
-
 
 extern callstack_t Callstack;
 extern bananakit_io_t IO;
@@ -330,3 +330,5 @@ int destroy_rc_station(rc_station_t *station) {
     free(station);
     return RC_SUCCESS;
 }
+
+#endif

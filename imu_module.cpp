@@ -1,7 +1,8 @@
+#include "bananakit.h"
+#ifdef ENABLE_IMU_MODULE
+
 #include <string.h>
 #include <stdlib.h>
-
-#include "bananakit.h"
 #include "callstack.h"
 #include "menu.h"
 #include "bananakit_io.h"
@@ -109,3 +110,5 @@ static void refresh_imu_display(void) {
     IO.flags = LCD_REFRESH_LINE2;
     IO.lcd_refresh_callback();
 }
+
+#endif

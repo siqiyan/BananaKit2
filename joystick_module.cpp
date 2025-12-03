@@ -1,9 +1,10 @@
+#include "bananakit.h"
+#ifdef ENABLE_JOYSTICK_MODULE
+
 #include <stdio.h>
 #include <stdint.h>
 #include <Arduino.h>
-
 #include "joystick_module.h"
-#include "bananakit.h"
 #include "callstack.h"
 #include "menu.h"
 #include "bananakit_io.h"
@@ -88,3 +89,4 @@ void joystick_resume(void) {
 void joystick_exit(void) {
 
 }
+#endif

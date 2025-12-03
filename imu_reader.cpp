@@ -1,3 +1,6 @@
+#include "bananakit.h"
+#ifdef ENABLE_IMU_MODULE // TODO: tmp solution for imu
+
 // Standard libraries:
 #include <stdlib.h>
 
@@ -159,3 +162,4 @@ int imu_update(imu_reader_t *imu) {
         return -2;
     }
 }
+#endif

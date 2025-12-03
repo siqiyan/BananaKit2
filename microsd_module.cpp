@@ -1,10 +1,11 @@
+#include "bananakit.h"
+#ifdef ENABLE_MICROSD_MODULE
+
 #include <string.h>
 #include <stdlib.h>
 #include <Arduino.h>
 #include <SD.h>
 #include <SPI.h>
-
-#include "bananakit.h"
 #include "callstack.h"
 #include "menu.h"
 #include "bananakit_io.h"
@@ -175,3 +176,5 @@ static void display_sd_info(void) {
     IO.flags = LCD_REFRESH_LINE3;
     IO.lcd_refresh_callback();
 }
+
+#endif

@@ -20,17 +20,17 @@ typedef struct {
 
 typedef struct {
     gnss_status_code_t  status;
-    int8_t debug_code0;
-    int8_t debug_code1;
-    int8_t debug_code2;
-    int8_t debug_code3;
+    uint8_t debug_code;
+    // int8_t debug_code1;
+    // int8_t debug_code2;
+    // int8_t debug_code3;
 
     geo_coordinate lat;
     geo_coordinate lon;
     geo_coordinate origin_lat;
     geo_coordinate origin_lon;
-    double ref_lat_dec;
-    double meters_per_deg_lon;
+    double ref_lat_dec;         // used to compute local coordinates
+    double meters_per_deg_lon;  // used to compute local coordinates
 
     int8_t utc_hour;
     int8_t utc_min;
@@ -48,8 +48,8 @@ gnss_reader_t *create_gnss_reader(void);
 int destroy_gnss_reader(gnss_reader_t *gnss);
 int parse_gnss_data_buf(gnss_reader_t *gnss);
 int gnss_update(gnss_reader_t *gnss, char c);
-int set_hemisphere(geo_coordinate *coord, char letter, int8_t is_lat);
+int set_hemisphere(geo_coordinate *coord, char letter, int is_lat);
 int set_origin(gnss_reader_t *gnss);
-int getLocalXY(const gnss_reader_t *gnss, double *x, double *y);
+int gps2localxy(const gnss_reader_t *gnss, double *x, double *y);
 
 #endif
