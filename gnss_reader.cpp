@@ -121,6 +121,7 @@ static int parse_gprmc_string(gnss_reader_t *gnss) {
     gnss->status.data_valid = 1;
 
     // UTC time
+#ifdef ENABLE_TIME_PARSE
     field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 1, field_buf, FIELD_BUF_SZ);
     if(field_sz >= 6) {
         ret_code = convert_verify_utc_time(
@@ -142,6 +143,7 @@ static int parse_gprmc_string(gnss_reader_t *gnss) {
         gnss->debug_code = 3;
         return 0;
     }
+#endif
 
     // Latitude: DDMM.MMMMMMM
     field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 3, field_buf, FIELD_BUF_SZ);
@@ -210,6 +212,7 @@ static int parse_gprmc_string(gnss_reader_t *gnss) {
     }
 
     // Date
+#ifdef ENABLE_TIME_PARSE
     field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 9, field_buf, FIELD_BUF_SZ);
     if(field_sz >= 6) {
         ret_code = convert_verify_date(
@@ -231,6 +234,7 @@ static int parse_gprmc_string(gnss_reader_t *gnss) {
         gnss->debug_code = 13;
         return 0;
     }
+#endif
 
     if(gnss->status.data_valid) {
         gnss->status.data_initialized = 1;
@@ -251,6 +255,7 @@ static int parse_gpgga_string(gnss_reader_t *gnss) {
     gnss->status.data_valid = 1;
 
     // UTC time: 1
+#ifdef ENABLE_TIME_PARSE
     field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 1, field_buf, FIELD_BUF_SZ);
     if(field_sz >= 6) {
         ret_code = convert_verify_utc_time(
@@ -272,6 +277,7 @@ static int parse_gpgga_string(gnss_reader_t *gnss) {
         gnss->debug_code = 15;
         return 0;
     }
+#endif
 
     // Latitude: 2
     field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 2, field_buf, FIELD_BUF_SZ);
@@ -442,6 +448,7 @@ static int convert_verify_latlon(
     return 0; // Success
 }
 
+#ifdef ENABLE_TIME_PARSE
 #define IDX_MINUTE 2
 #define IDX_SECOND 4
 static int convert_verify_utc_time(const char *field, int n, int8_t *hour, int8_t *minute, double *second) {
@@ -565,6 +572,7 @@ static int convert_verify_date(
 
     return 0; // Success
 }
+#endif
 
 int set_origin(gnss_reader_t *gnss) {
     // Modified from Gemini generated code
@@ -589,11 +597,11 @@ int set_origin(gnss_reader_t *gnss) {
     }
 }
 
-int gps2localxy(const gnss_reader_t *gnss, double *x, double *y) {
+int gnss_update_local_xy(gnss_reader_t *gnss) {
     // Modified from Gemini generated code
     // Return: bool
 
-    if((!gnss->status.origin_initialized) || (!gnss->status.data_valid)) {
+    if((!gnss->status.origin_initialized) || (!gnss->status.data_initialized) || (!gnss->status.data_valid)) {
         return 0; // failed
     }
 
@@ -612,8 +620,8 @@ int gps2localxy(const gnss_reader_t *gnss, double *x, double *y) {
 
     // 4. Convert to Meters (Local X, Y)
     // Y is North-South, X is East-West
-    *y = total_delta_lat * METERS_PER_DEGREE_LAT;
-    *x = total_delta_lon * gnss->meters_per_deg_lon;
+    gnss->local_y = total_delta_lat * METERS_PER_DEGREE_LAT;
+    gnss->local_x = total_delta_lon * gnss->meters_per_deg_lon;
 
     return 1; // success
 }

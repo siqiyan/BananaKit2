@@ -5,8 +5,6 @@
 #include <stdlib.h>
 #include <math.h>
 #include <Arduino.h>
-// #include <SD.h>
-// #include <SPI.h>
 #include "callstack.h"
 #include "menu.h"
 #include "bananakit_io.h"
@@ -44,10 +42,6 @@ node_status_t gps_module_update(void) {
             next_status = NODE_EXITING;
             break;
 
-        case PIC_PLAY:
-            // Start record:
-            break;
-
         case PIC_EQ:
             // Set origin:
             set_origin(GNSS);
@@ -76,7 +70,6 @@ static void refresh_gps_info_display(void) {
     char floatbuf[FLOAT_BUF_SZ];
     double float_value;
     char tail;
-    double x, y;
 
     IO.lcd_clear_callback();
 
@@ -94,7 +87,7 @@ static void refresh_gps_info_display(void) {
     if(GNSS->status.data_valid) {
         tail = ' ';
     } else {
-        tail = '?';
+        tail = 'x';
     }
 
     if(!GNSS->status.data_initialized) {
@@ -122,6 +115,7 @@ static void refresh_gps_info_display(void) {
     // Line1: "2025-12-02 18:23:00"
     // If !data_initialized then show "time n/a"
     // If !data_valid then show "2025-12-02 18:23:00?"
+#ifdef ENABLE_TIME_PARSE
     if(!GNSS->status.data_initialized) {
         strncpy(IO.lcd_buf, "time n/a", LCD_BUF_SIZE);
     } else {
@@ -132,36 +126,37 @@ static void refresh_gps_info_display(void) {
             tail
         );
     }
+#else
+    strncpy(IO.lcd_buf, "time n/a", LCD_BUF_SIZE);
+#endif
     IO.flags = LCD_REFRESH_LINE1;
     IO.lcd_refresh_callback();
 
     // Line2: "x:107.12,y:-512.33"
     // If abs(x) > 100 || abs(y) > 100 then show "x,y oversized"
-    // If (origin not set) || (!data_initialized) then show "x,y n/a"
-    if((!GNSS->status.data_initialized) || (!GNSS->status.origin_initialized)) {
+    // If failed then show "x,y n/a"
+    if(!gnss_update_local_xy(GNSS)) {
         strncpy(IO.lcd_buf, "x,y n/a", LCD_BUF_SIZE);
     } else {
-        gps2localxy(GNSS, &x, &y);
-        if(fabs(x) > 100 || fabs(y > 100)) {
+        if(fabs(GNSS->local_x) > 100 || fabs(GNSS->local_y > 100)) {
             strncpy(IO.lcd_buf, "x,y oversized", LCD_BUF_SIZE);
         } else {
             offset = 0;
-            float2str(x, floatbuf, FLOAT_BUF_SZ, 2);
+            float2str(GNSS->local_x, floatbuf, FLOAT_BUF_SZ, 2);
             offset += snprintf(IO.lcd_buf+offset, LCD_BUF_SIZE-offset, "x:%s,", floatbuf);
-            float2str(y, floatbuf, FLOAT_BUF_SZ, 2);
+            float2str(GNSS->local_y, floatbuf, FLOAT_BUF_SZ, 2);
             offset += snprintf(IO.lcd_buf+offset, LCD_BUF_SIZE-offset, "y:%s", floatbuf);
         }
     }
     IO.flags = LCD_REFRESH_LINE2;
     IO.lcd_refresh_callback();
 
-    // Line3: "rec:gps003.csv debug:10"
-    // If not recording then "rec:off debug:10"
+    // Line3: "debug:10"
     offset = 0;
     offset += snprintf(
         IO.lcd_buf+offset,
         LCD_BUF_SIZE-offset,
-        "rec:off debug:%d",
+        "debug:%d",
         GNSS->debug_code
     );
     IO.flags = LCD_REFRESH_LINE3;
