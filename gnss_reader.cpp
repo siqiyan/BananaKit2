@@ -598,20 +598,27 @@ int set_origin(gnss_reader_t *gnss) {
 }
 
 int gnss_update_local_xy(gnss_reader_t *gnss) {
-    // Modified from Gemini generated code
     // Return: bool
-
     if((!gnss->status.origin_initialized) || (!gnss->status.data_initialized) || (!gnss->status.data_valid)) {
+        return 0; // failed
+    }
+    return gps2localxy(gnss, &gnss->lat, &gnss->lon, &gnss->local_x, &gnss->local_y);
+}
+
+int gps2localxy(const gnss_reader_t *gnss, const geo_coordinate *lat, geo_coordinate *lon, double *x, double *y) {
+    // Modified from Gemini generated code
+
+    if((!gnss->status.origin_initialized) || (!gnss->status.data_initialized)) {
         return 0; // failed
     }
 
     // 1. Calculate the difference in DEGREES
-    int16_t deg_diff_lat = gnss->lat.degree - gnss->origin_lat.degree;
-    int16_t deg_diff_lon = gnss->lon.degree - gnss->origin_lon.degree;
+    int16_t deg_diff_lat = lat->degree - gnss->origin_lat.degree;
+    int16_t deg_diff_lon = lon->degree - gnss->origin_lon.degree;
 
     // 2. Calculate the difference in MINUTES
-    double min_diff_lat = gnss->lat.minute - gnss->origin_lat.minute;
-    double min_diff_lon = gnss->lon.minute - gnss->origin_lon.minute;
+    double min_diff_lat = lat->minute - gnss->origin_lat.minute;
+    double min_diff_lon = lon->minute - gnss->origin_lon.minute;
 
     // 3. Combine them into a single "Delta Degree" float
     // This number is SMALL, so we don't lose precision
@@ -620,10 +627,10 @@ int gnss_update_local_xy(gnss_reader_t *gnss) {
 
     // 4. Convert to Meters (Local X, Y)
     // Y is North-South, X is East-West
-    gnss->local_y = total_delta_lat * METERS_PER_DEGREE_LAT;
-    gnss->local_x = total_delta_lon * gnss->meters_per_deg_lon;
+    *y = total_delta_lat * METERS_PER_DEGREE_LAT;
+    *x = total_delta_lon * gnss->meters_per_deg_lon;
 
-    return 1; // success
+    return 1;
 }
 
 int set_hemisphere(geo_coordinate *coord, char letter, int is_lat) {

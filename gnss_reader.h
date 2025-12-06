@@ -54,5 +54,6 @@ int gnss_update(gnss_reader_t *gnss, char c);
 int set_hemisphere(geo_coordinate *coord, char letter, int is_lat);
 int set_origin(gnss_reader_t *gnss);
 int gnss_update_local_xy(gnss_reader_t *gnss);
+int gps2localxy(const gnss_reader_t *gnss, const geo_coordinate *lat, geo_coordinate *lon, double *x, double *y);
 
 #endif
