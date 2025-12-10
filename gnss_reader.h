@@ -7,10 +7,13 @@
 #define METERS_PER_DEGREE_LAT 111132.92
 
 typedef struct {
-    int8_t sign;
-    int16_t degree;
-    double minute;
-} geo_coordinate;
+    uint8_t lat_north_positive:     1;
+    uint8_t lon_east_positive:      1;
+    uint8_t lat_degree;
+    uint8_t lon_degree;
+    double lat_minute;
+    double lon_minute;
+} geo_coordinate_t;
 
 typedef struct {
     uint8_t data_valid          : 1;
@@ -23,10 +26,9 @@ typedef struct {
     gnss_status_code_t  status;
     uint8_t debug_code;
 
-    geo_coordinate lat;
-    geo_coordinate lon;
-    geo_coordinate origin_lat;
-    geo_coordinate origin_lon;
+    geo_coordinate_t coord;
+    geo_coordinate_t origin;
+
     double ref_lat_dec;         // used to compute local coordinates
     double meters_per_deg_lon;  // used to compute local coordinates
 
@@ -51,9 +53,11 @@ gnss_reader_t *create_gnss_reader(void);
 int destroy_gnss_reader(gnss_reader_t *gnss);
 int parse_gnss_data_buf(gnss_reader_t *gnss);
 int gnss_update(gnss_reader_t *gnss, char c);
-int set_hemisphere(geo_coordinate *coord, char letter, int is_lat);
+int set_hemisphere(geo_coordinate_t *coord, char letter, int is_lat);
 int set_origin(gnss_reader_t *gnss);
 int gnss_update_local_xy(gnss_reader_t *gnss);
-int gps2localxy(const gnss_reader_t *gnss, const geo_coordinate *lat, geo_coordinate *lon, double *x, double *y);
+int gps2localxy(const gnss_reader_t *gnss, const geo_coordinate_t *coord, double *x, double *y);
+double get_latitude_value(const geo_coordinate_t *coord);
+double get_lontitude_value(const geo_coordinate_t *coord);
 
 #endif

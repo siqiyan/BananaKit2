@@ -95,14 +95,14 @@ static void refresh_gps_info_display(void) {
     } else {
         offset = 0;
         float2str(
-            ((double) GNSS->lat.degree * GNSS->lat.sign) + GNSS->lat.minute / 60.0,
+            get_latitude_value(&GNSS->coord),
             floatbuf,
             FLOAT_BUF_SZ,
             4
         );
         offset += snprintf(IO.lcd_buf+offset, LCD_BUF_SIZE-offset, "%s,", floatbuf);
         float2str(
-            ((double) GNSS->lon.degree * GNSS->lon.sign) + GNSS->lon.minute / 60.0,
+            get_lontitude_value(&GNSS->coord),
             floatbuf,
             FLOAT_BUF_SZ,
             4

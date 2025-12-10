@@ -10,7 +10,7 @@
 
 static int parse_gprmc_string(gnss_reader_t *gnss);
 static int parse_gpgga_string(gnss_reader_t *gnss);
-static int convert_verify_latlon(const char *field, int n, int ndd, int16_t *degree, double *minute);
+static int convert_verify_latlon(const char *field, int n, int ndd, uint8_t *degree, double *minute);
 static int convert_verify_utc_time(const char *field, int n, int8_t *hour, int8_t *minute, double *second);
 static int convert_verify_date(const char *field, int n, int16_t *year, int8_t *month, int16_t *day);
 
@@ -148,7 +148,8 @@ static int parse_gprmc_string(gnss_reader_t *gnss) {
     // Latitude: DDMM.MMMMMMM
     field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 3, field_buf, FIELD_BUF_SZ);
     if(field_sz >= 7) {
-        ret_code = convert_verify_latlon(field_buf, field_sz, 2, &gnss->lat.degree, &gnss->lat.minute);
+        // ret_code = convert_verify_latlon(field_buf, field_sz, 2, &gnss->lat.degree, &gnss->lat.minute);
+        ret_code = convert_verify_latlon(field_buf, field_sz, 2, &gnss->coord.lat_degree, &gnss->coord.lat_minute);
         if(ret_code != 0) {
             // Error: fail to parse latitude
             gnss->status.data_valid = 0;
@@ -165,7 +166,7 @@ static int parse_gprmc_string(gnss_reader_t *gnss) {
     // Hemisphere of latitude
     field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 4, field_buf, FIELD_BUF_SZ);
     if(field_sz > 0) {
-        if(!set_hemisphere(&gnss->lat, field_buf[0], 1)) {
+        if(!set_hemisphere(&gnss->coord, field_buf[0], 1)) {
             // Error: fail to parse hemisphere of latitude
             gnss->status.data_valid = 0;
             gnss->debug_code = 6;
@@ -181,7 +182,7 @@ static int parse_gprmc_string(gnss_reader_t *gnss) {
     // Longitude: DDDMM.MMMMMMM
     field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 5, field_buf, FIELD_BUF_SZ);
     if(field_sz >= 8) {
-        ret_code = convert_verify_latlon(field_buf, field_sz, 3, &gnss->lon.degree, &gnss->lon.minute);
+        ret_code = convert_verify_latlon(field_buf, field_sz, 3, &gnss->coord.lon_degree, &gnss->coord.lon_minute);
         if(ret_code != 0) {
             // Error: fail to parse longitude field
             gnss->status.data_valid = 0;
@@ -198,7 +199,7 @@ static int parse_gprmc_string(gnss_reader_t *gnss) {
     // Hemisphere of longitude
     field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 6, field_buf, FIELD_BUF_SZ);
     if(field_sz > 0) {
-        if(!set_hemisphere(&gnss->lon, field_buf[0], 0)) {
+        if(!set_hemisphere(&gnss->coord, field_buf[0], 0)) {
             // Error: failed to parse hemisphere of longitude
             gnss->status.data_valid = 0;
             gnss->debug_code = 10;
@@ -282,7 +283,7 @@ static int parse_gpgga_string(gnss_reader_t *gnss) {
     // Latitude: 2
     field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 2, field_buf, FIELD_BUF_SZ);
     if(field_sz >= 7) {
-        ret_code = convert_verify_latlon(field_buf, field_sz, 2, &gnss->lat.degree, &gnss->lat.minute);
+        ret_code = convert_verify_latlon(field_buf, field_sz, 2, &gnss->coord.lat_degree, &gnss->coord.lat_minute);
         if(ret_code != 0) {
             // Error: failed to parse latitude field
             gnss->status.data_valid = 0;
@@ -299,7 +300,7 @@ static int parse_gpgga_string(gnss_reader_t *gnss) {
     // Hemisphere of latitude: 3
     field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 3, field_buf, FIELD_BUF_SZ);
     if(field_sz > 0) {
-        if(!set_hemisphere(&gnss->lat, field_buf[0], 1)) {
+        if(!set_hemisphere(&gnss->coord, field_buf[0], 1)) {
             // Error: failed to parse hemisphere of latitude field
             gnss->status.data_valid = 0;
             gnss->debug_code = 18;
@@ -315,7 +316,7 @@ static int parse_gpgga_string(gnss_reader_t *gnss) {
     // Longitude: 4 DDDMM.MMMMMMM
     field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 4, field_buf, FIELD_BUF_SZ);
     if(field_sz >= 8) {
-        ret_code = convert_verify_latlon(field_buf, field_sz, 3, &gnss->lon.degree, &gnss->lon.minute);
+        ret_code = convert_verify_latlon(field_buf, field_sz, 3, &gnss->coord.lon_degree, &gnss->coord.lon_minute);
         if(ret_code != 0) {
             // Error: failed to parse longitude field
             gnss->status.data_valid = 0;
@@ -332,7 +333,7 @@ static int parse_gpgga_string(gnss_reader_t *gnss) {
     // Hemisphere of longitude: 5
     field_sz = field_extract(gnss->buf, gnss->buf_count, ',', 5, field_buf, FIELD_BUF_SZ);
     if(field_sz > 0) {
-        if(!set_hemisphere(&gnss->lon, field_buf[0], 0)) {
+        if(!set_hemisphere(&gnss->coord, field_buf[0], 0)) {
             // Error: failed to parse hemisphere of longitude field
             gnss->status.data_valid = 0;
             gnss->debug_code = 22;
@@ -387,7 +388,7 @@ static int convert_verify_latlon(
     const char *field,
     int n,
     int ndd,
-    int16_t *degree,
+    uint8_t *degree,
     double *minute
 ) {
     // Convert and verify string to latitude(in degree and minute)
@@ -579,12 +580,11 @@ int set_origin(gnss_reader_t *gnss) {
     // Return: bool
 
     if(gnss->status.data_initialized) {
-        gnss->origin_lat = gnss->lat;
-        gnss->origin_lon = gnss->lon;
+        gnss->origin = gnss->coord;
 
         // Calculate total decimal latitude for the cosine calculation only
         // We only do this ONCE to save processing power
-        gnss->ref_lat_dec = gnss->origin_lat.degree + (gnss->origin_lat.minute / 60.0);
+        gnss->ref_lat_dec = gnss->origin.lat_degree + (gnss->origin.lat_minute / 60.0);
 
         // Pre-calculate the longitude scaling factor based on current latitude
         // conversion: degrees to radians for cos function
@@ -602,10 +602,10 @@ int gnss_update_local_xy(gnss_reader_t *gnss) {
     if((!gnss->status.origin_initialized) || (!gnss->status.data_initialized) || (!gnss->status.data_valid)) {
         return 0; // failed
     }
-    return gps2localxy(gnss, &gnss->lat, &gnss->lon, &gnss->local_x, &gnss->local_y);
+    return gps2localxy(gnss, &gnss->coord, &gnss->local_x, &gnss->local_y);
 }
 
-int gps2localxy(const gnss_reader_t *gnss, const geo_coordinate *lat, geo_coordinate *lon, double *x, double *y) {
+int gps2localxy(const gnss_reader_t *gnss, const geo_coordinate_t *coord, double *x, double *y) {
     // Modified from Gemini generated code
 
     if((!gnss->status.origin_initialized) || (!gnss->status.data_initialized)) {
@@ -613,12 +613,12 @@ int gps2localxy(const gnss_reader_t *gnss, const geo_coordinate *lat, geo_coordi
     }
 
     // 1. Calculate the difference in DEGREES
-    int16_t deg_diff_lat = lat->degree - gnss->origin_lat.degree;
-    int16_t deg_diff_lon = lon->degree - gnss->origin_lon.degree;
+    int16_t deg_diff_lat = coord->lat_degree - gnss->origin.lat_degree;
+    int16_t deg_diff_lon = coord->lon_degree - gnss->origin.lon_degree;
 
     // 2. Calculate the difference in MINUTES
-    double min_diff_lat = lat->minute - gnss->origin_lat.minute;
-    double min_diff_lon = lon->minute - gnss->origin_lon.minute;
+    double min_diff_lat = coord->lat_minute - gnss->origin.lat_minute;
+    double min_diff_lon = coord->lon_minute - gnss->origin.lon_minute;
 
     // 3. Combine them into a single "Delta Degree" float
     // This number is SMALL, so we don't lose precision
@@ -633,7 +633,7 @@ int gps2localxy(const gnss_reader_t *gnss, const geo_coordinate *lat, geo_coordi
     return 1;
 }
 
-int set_hemisphere(geo_coordinate *coord, char letter, int is_lat) {
+int set_hemisphere(geo_coordinate_t *coord, char letter, int is_lat) {
     // To help clarify the hemisphere letters and sign of geo coordinate.
     // According to Gemini:
     // The standard convention used in GPS, WGS84, and almost all digital navigation systems is:
@@ -650,23 +650,47 @@ int set_hemisphere(geo_coordinate *coord, char letter, int is_lat) {
     if(is_lat) {
         // Latitude
         if(letter == 'N' || letter == 'n') {
-            coord->sign = 1;
+            coord->lat_north_positive = 1;
+            return 1;
         } else if(letter == 'S' || letter == 's') {
-            coord->sign = -1;
+            // coord->sign = -1;
+            coord->lat_north_positive = 0;
+            return 1;
         } else {
-            coord->sign = 0; // error
+            // error
             return 0;
         }
     } else {
         // Longitude
         if(letter == 'E' || letter == 'e') {
-            coord->sign = 1;
+            // coord->sign = 1;
+            coord->lon_east_positive = 1;
+            return 1;
         } else if(letter == 'W' || letter == 'w') {
-            coord->sign = -1;
+            // coord->sign = -1;
+            coord->lon_east_positive = 0;
+            return 1;
         } else {
-            coord->sign = 0; // error
+            // error
             return 0;
         }
     }
-    return 1;
+}
+
+double get_latitude_value(const geo_coordinate_t *coord) {
+    // Get single number latitude (low precision on Arduino MCU):
+    if(coord->lat_north_positive) {
+        return ((double) coord->lat_degree) + coord->lat_minute / 60.0;
+    } else {
+        return -((double) coord->lat_degree) - coord->lat_minute / 60.0;
+    }
+}
+
+double get_lontitude_value(const geo_coordinate_t *coord) {
+    // Get single number lontitude (low precision on Arduino MCU):
+    if(coord->lon_east_positive) {
+        return ((double) coord->lon_degree) + coord->lon_minute / 60.0;
+    } else {
+        return -((double) coord->lon_degree) - coord->lon_minute / 60.0;
+    }
 }
