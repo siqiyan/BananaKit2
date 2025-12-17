@@ -23,12 +23,12 @@ static void generate_throttle_effect(char *out, int sz);
 
 extern callstack_t Callstack;
 extern bananakit_io_t IO;
-RF24 RF_radio(NRF24_CE_PIN, NRF24_CSN_PIN);
+static RF24 RF_radio(NRF24_CE_PIN, NRF24_CSN_PIN);
 rc_station_t Station;
-int64_t __Timestamp, currTimestamp;
-int64_t prevUpdateTimestamp, prevRenderTimestamp;
-int32_t sequenceID;
-int16_t frameCounter;
+static int64_t __Timestamp, currTimestamp;
+static int64_t prevUpdateTimestamp, prevRenderTimestamp;
+static int32_t sequenceID;
+static int16_t frameCounter;
 
 void rc_station_init(void) {
     // Serial.begin(UART_SPEED_BPS);
