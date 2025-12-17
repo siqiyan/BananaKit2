@@ -8,29 +8,68 @@
 #include <CRC.h>
 
 #include "rc_vehicle_common.h"
+#include "gnss_reader.h"
 
-#define UART_SPEED_BPS 115200
+// #define UART_SPEED_BPS 115200
+#define MAIN_LOOP_PERIOD        100 // ms, 100ms = 10Hz
+#define RENDER_LOOP_PERIOD      500 // 2Hz
 
-#define RC_SUCCESS      1
-#define RC_ERR_NUL_PTR  0
+typedef enum {
+    SM_UNCONNECT,
+    SM_MANUAL,
+    SM_MANU_ESTOP_INIT,
+    SM_MANU_ESTOP,
+    SM_NAVIGATE1,
+    SM_NAVIGATE2,
+    SM_NAV_ESTOP_INIT,
+    SM_NAV_ESTOP,
+    SM_SETTING,
+    SM_DEBUG1,
+    SM_DEBUG2,
+    SM_DEBUG3
+} station_state_machine_t;
 
+typedef struct {
+    uint8_t navigate_running:       1;
+    uint8_t gps_data_valid:         1;
+    uint8_t gps_initialized:        1;
+    uint8_t gps_origin_set:         1;
+    uint8_t cmd_auto_mode:          1;
+    uint8_t cmd_navigate_start:     1;
+    uint8_t cmd_navigate_cancel:    1;
+    uint8_t cmd_estop:              1;
+    // uint8_t cmd_sync_timestamp:     1;
+    uint8_t cmd_set_origin:         1;
+    uint8_t sync_with_vehicle:      1;
+    uint8_t func_key1_pressed:      1;
+    uint8_t func_key2_pressed:      1;
+    uint8_t func_key3_pressed:      1;
+} rc_station_status_t;
 
 // RC station variables:
 typedef struct __rc_station__ {
-    int64_t timestamp;
-    int16_t frame_counter;
-    status_code_t status_code;
-    float twist_x, twist_y, twist_yaw;
-    int32_t goal_latitude_int, goal_longitude_int, goal_orientation_int;
-    int16_t adc_value;
-    int32_t latitude_int, longitude_int, altitude_int, orientation_int;
-    uint8_t sm_state;
-    uint8_t toggle_ts_sync;
-    int joy_neutral_pos_x;
-    int joy_neutral_pos_y;
-    float speed_multi;
+    rc_station_status_t status;
+    float               twist_x, twist_yaw;
+    float               tx_rpy, tyaw_rpy;
+    int16_t             adc_value;
+    geo_coordinate_t    vehicle_coordinate;
+    int16_t             joy_neutral_pos_x;
+    int16_t             joy_neutral_pos_y;
+    uint8_t             gear;
+    float               ekf_x;
+    float               ekf_y;
+    float               ekf_yaw;
+    float               ekf_v;
+    float               ekf_vyaw;
+    uint8_t             left_pwm;
+    uint8_t             right_pwm;
+    int32_t             delta_ms;
+    float               dist2goal;
+    int8_t              waypoint_index;
+    int8_t              waypoint_list_sz;
+    uint8_t             debug_code;
+    station_state_machine_t  sm_state;
 } rc_station_t;
-
 
 void rc_station_init(void);
 node_status_t rc_station_update(void);
