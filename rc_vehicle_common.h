@@ -82,7 +82,7 @@ typedef struct __attribute__((__packed__)) __v2s_frame {
     int8_t waypoint_list_sz;
     int32_t delta_ms;
     int32_t dist2goal_int;
-    int16_t adc_value;
+    int16_t battery_adc_value;
     uint8_t debug_code;
 } v2s_frame_t;
 

@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <math.h>
 #include <Arduino.h>
 #include <util/atomic.h>
 #include "callstack.h"
@@ -50,12 +51,13 @@ void rc_station_init(void) {
 
     // Init rc station variables:
     memset(&Station.status, 0, sizeof(rc_station_status_t)); // clear all status bits
+    Station.status.sync_with_vehicle = 1;
     Station.twist_x                     = 0.0;
     Station.twist_yaw                   = 0.0;
     Station.tx_rpy                      = 0.0;
     Station.tyaw_rpy                    = 0.0;
-    Station.joy_neutral_pos_x           = 512;
-    Station.joy_neutral_pos_y           = 512;
+    Station.joy_neutral_pos_x           = 635;
+    Station.joy_neutral_pos_y           = 645;
     Station.debug_code                  = 0;
     Station.sm_state                    = SM_UNCONNECT;
 
@@ -131,19 +133,22 @@ void rc_station_interrupt(void) {
 // Local functions:
 static void update_keyboard_inputs(void) {
     float analog_value_f;
-    float scaled_linear_speed;
-    float scaled_angular_speed;
-    float latitude, longitude, altitude, orientation;
     int16_t volt0_adc;
     float max_linear_velocity;
+    float axis_range_f;
+    int16_t adc_value;
 
     // Compute rotation twist command:
+    // analogRead() => [0, 1023]
+    // neutral_pos = 635
+    // 
     analog_value_f = (float) (analogRead(JOY_VRY) - Station.joy_neutral_pos_y);
     if(analog_value_f >= 0) {
-        Station.twist_yaw = analog_value_f / (1024 - Station.joy_neutral_pos_y) * MAX_ANGULAR_VEL;
+        axis_range_f = 1024.0 - (float) Station.joy_neutral_pos_y;
     } else {
-        Station.twist_yaw = analog_value_f / Station.joy_neutral_pos_y * MAX_ANGULAR_VEL;
+        axis_range_f = (float) Station.joy_neutral_pos_y;
     }
+    Station.twist_yaw = analog_value_f / axis_range_f * MAX_ANGULAR_VEL;
 
     // Compute speed limit values:
     // Station.speed_multi = ((float) analogRead(VOLT0_READ_PIN)) / 1024.0;
@@ -169,10 +174,11 @@ static void update_keyboard_inputs(void) {
     // Longitudinal corresponds to joystick x-axis, positive value forward
     analog_value_f = (float) (analogRead(JOY_VRX) - Station.joy_neutral_pos_x);
     if(analog_value_f >= 0) {
-        Station.twist_x = analog_value_f / (1024 - Station.joy_neutral_pos_x) * max_linear_velocity;
+        axis_range_f = 1024.0 - (float) Station.joy_neutral_pos_x;
     } else {
-        Station.twist_x = analog_value_f / Station.joy_neutral_pos_x * max_linear_velocity;
+        axis_range_f = (float) Station.joy_neutral_pos_x;
     }
+    Station.twist_x = analog_value_f / axis_range_f * max_linear_velocity;
 
     // Detect push button press event:
     Station.status.func_key1_pressed = 0;
@@ -207,7 +213,7 @@ static void update_communication(int64_t timestamp) {
         // Receive v2b frame from vehicle Arduino:
         RF_radio.read(&v2sframe, sizeof(v2s_frame_t));
 
-        if(abs(timestamp - v2sframe.timestamp) < 1000) {
+        if(abs(timestamp - v2sframe.timestamp) < 1000 && v2sframe.header == FRAME_HEADER_ID) {
             Station.status.navigate_running                 = v2sframe.status.navigate_running;
             Station.status.gps_initialized                  = v2sframe.status.gps_initialized;
             Station.status.gps_data_valid                   = v2sframe.status.gps_data_valid;
@@ -232,18 +238,20 @@ static void update_communication(int64_t timestamp) {
             Station.left_pwm            = v2sframe.left_pwm;
             Station.right_pwm           = v2sframe.right_pwm;
             Station.debug_code          = v2sframe.debug_code;
-            Station.adc_value           = v2sframe.adc_value;
+            Station.battery_adc_value   = v2sframe.battery_adc_value;
             Station.delta_ms            = v2sframe.delta_ms;
             Station.status.sync_with_vehicle = 1;
         } else {
-            // If incoming data is out-of-date:
-            Station.status.sync_with_vehicle = 0;
+            // If incoming data is out-of-date or frame header mismatch:
+            // Station.status.sync_with_vehicle = 0;
         }
     } else {
-        delay(5);
+        // Station.status.sync_with_vehicle = 0;
+        // delay(5);
     }
 
     // Reply s2v frame to vehicle:
+    s2vframe.header = FRAME_HEADER_ID;
     s2vframe.timestamp = timestamp;
     s2vframe.sequence_id = frameCounter;
     frameCounter++;
@@ -433,7 +441,7 @@ static void render(void) {
         case SM_NAVIGATE2:
         case SM_NAV_ESTOP:
         case SM_DEBUG1:
-            float2str(GET_ADC_VOLT(Station.adc_value), floatbuf, LCD_BUF_SIZE, 1);
+            float2str(GET_ADC_VOLT(Station.battery_adc_value), floatbuf, LCD_BUF_SIZE, 1);
             snprintf(
                 IO.lcd_buf,
                 LCD_BUF_SIZE,
@@ -445,7 +453,6 @@ static void render(void) {
             IO.lcd_refresh_callback();
             break;
         case SM_DEBUG2:
-            float2str(GET_ADC_VOLT(Station.adc_value), floatbuf, LCD_BUF_SIZE, 1);
             snprintf(
                 IO.lcd_buf,
                 LCD_BUF_SIZE,
@@ -729,31 +736,34 @@ static void generate_steer_effect(char *out, int sz) {
     const int m = 5;
     const int n = 13;
     const int k = 7;
+    // char floatbuf[20];
+    char arrows[6];
     int i;
-    int num_arrows = (int) (fabs(Station.tyaw_rpy) / MAX_ANGULAR_VEL * 5.0);
+    int num_arrows = (int) (fabs(Station.twist_yaw) / MAX_ANGULAR_VEL * 5.0);
     
     if(num_arrows < 0) {
         num_arrows = 0;
-    } else if(num_arrows > 5) {
-        num_arrows = 5;
+    } else if(num_arrows > 4) {
+        num_arrows = 4;
     }
 
     // Clear output:
-    memset(out, ' ', sz);
-    out[sz-1] = '\0';
+    memset(arrows, ' ', 5);
 
-    strncpy(out+k, "STEER", sz-k);
-
-    if(Station.tyaw_rpy >= 0) {
+    if(Station.twist_yaw >= 0) {
         // Right rotation
-        for(i = n; i < n + num_arrows; i++) {
-            out[i] = '>';
+        for(i = 0; i < num_arrows; i++) {
+            arrows[i] = '>';
         }
+        arrows[i] = '\0';
+        snprintf(out, sz, "      STEER %s ", arrows);
     } else {
         // Left rotation
-        for(i = m; i > m - num_arrows; i--) {
-            out[i] = '<';
+        for(i = 5 - num_arrows; i < 5; i++) {
+            arrows[i] = '<';
         }
+        arrows[i] = '\0';
+        snprintf(out, sz, " %s STEER", arrows);
     }
 }
 
@@ -772,32 +782,65 @@ static void generate_throttle_effect(char *out, int sz) {
     const int a = 5;
     const int b = 9;
     const int c = 13;
-    int m = (int) (fabs(Station.tx_rpy) / MAX_ANGULAR_VEL * 5.0);
+    float max_linear_velocity;
+    // int m = (int) (fabs(Station.tx_rpy) / MAX_ANGULAR_VEL * 5.0);
+    int m;
     int i;
+    char arrows[6];
+
+    switch(Station.gear) {
+        case 0:
+            max_linear_velocity = GEAR0_SPEED;
+            break;
+        case 1:
+            max_linear_velocity = GEAR1_SPEED;
+            break;
+        case 2:
+            max_linear_velocity = GEAR2_SPEED;
+            break;
+        case 3:
+            max_linear_velocity = GEAR3_SPEED;
+            break;
+        case 4:
+            max_linear_velocity = GEAR4_SPEED;
+            break;
+        default:
+            max_linear_velocity = 0.0;
+            break;
+    }
+    m = (int) (fabs(Station.twist_x) / max_linear_velocity * 5.0);
     
     if(m < 0) {
         m = 0;
-    } else if(m > 5) {
-        m = 5;
+    } else if(m > 4) {
+        m = 4;
     }
 
     // Clear output:
-    memset(out, ' ', sz);
-    out[sz-1] = '\0';
+    // memset(out, ' ', sz);
+    memset(arrows, ' ', 6);
 
-    if(Station.tyaw_rpy >= 0) {
+    for(i = 0; i < m; i++) {
+        arrows[i] = '+';
+    }
+    arrows[5] = '\0';
+
+    if(Station.twist_x >= 0) {
         // Forward acceleration
-        strncpy(out, "ACCEL", sz);
+        // strncpy(out, "ACCEL", sz);
+        snprintf(out, sz, "ACCEL%s    GEAR:%d", arrows, Station.gear);
     } else {
         // Reverse
-        strncpy(out, "REVER", sz);
+        // strncpy(out, "REVER", sz);
+        snprintf(out, sz, "REVER%s    GEAR:%d", arrows, Station.gear);
     }
 
-    for(i = a; i < m; i++) {
-        out[i] = '+';
-    }
+    // for(i = a; i < m; i++) {
+    //     out[i] = '+';
+    // }
 
-    snprintf(out+c, sz-c, "GEAR:%d", Station.gear);
+    // snprintf(out+c, sz-c, "GEAR:%d", Station.gear);
+    // out[sz-1] = '\0';
 }
 
 #endif
