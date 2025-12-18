@@ -51,11 +51,11 @@ void rc_station_init(void) {
 
     // Init rc station variables:
     memset(&Station.status, 0, sizeof(rc_station_status_t)); // clear all status bits
-    Station.status.sync_with_vehicle = 1;
+    // Station.status.sync_with_vehicle    = 0;
     Station.twist_x                     = 0.0;
     Station.twist_yaw                   = 0.0;
-    Station.tx_rpy                      = 0.0;
-    Station.tyaw_rpy                    = 0.0;
+    // Station.tx_rpy                      = 0.0;
+    // Station.tyaw_rpy                    = 0.0;
     Station.joy_neutral_pos_x           = 635;
     Station.joy_neutral_pos_y           = 645;
     Station.debug_code                  = 0;
@@ -136,23 +136,21 @@ static void update_keyboard_inputs(void) {
     int16_t volt0_adc;
     float max_linear_velocity;
     float axis_range_f;
-    int16_t adc_value;
 
     // Compute rotation twist command:
-    // analogRead() => [0, 1023]
-    // neutral_pos = 635
-    // 
     analog_value_f = (float) (analogRead(JOY_VRY) - Station.joy_neutral_pos_y);
     if(analog_value_f >= 0) {
         axis_range_f = 1024.0 - (float) Station.joy_neutral_pos_y;
     } else {
         axis_range_f = (float) Station.joy_neutral_pos_y;
     }
-    Station.steer_percent = analog_value_f / axis_range_f;
+    if(!Station.status.sync_with_vehicle) {
+        // Not receiving feedback command from vehicle, use local joystick command directly:
+        Station.steer_percent = analog_value_f / axis_range_f;
+    }
     Station.twist_yaw = analog_value_f / axis_range_f * MAX_ANGULAR_VEL;
 
     // Compute speed limit values:
-    // Station.speed_multi = ((float) analogRead(VOLT0_READ_PIN)) / 1024.0;
     volt0_adc = analogRead(VOLT0_READ_PIN);
     if(volt0_adc >= 0 && volt0_adc < 200) {
         Station.gear = 0;
@@ -179,7 +177,10 @@ static void update_keyboard_inputs(void) {
     } else {
         axis_range_f = (float) Station.joy_neutral_pos_x;
     }
-    Station.throttle_percent = analog_value_f / axis_range_f;
+    if(!Station.status.sync_with_vehicle) {
+        // Not receiving feedback command from vehicle, use local joystick command directly:
+        Station.throttle_percent = analog_value_f / axis_range_f;
+    }
     Station.twist_x = analog_value_f / axis_range_f * max_linear_velocity;
 
     // Detect push button press event:
@@ -232,8 +233,10 @@ static void update_communication(int64_t timestamp) {
             Station.ekf_vyaw    = ((float) v2sframe.ekf_vyaw_int)   / ANG_VEL_F2I_MULTI;
             Station.ekf_v       = ((float) v2sframe.ekf_v_int)      / LIN_VEL_F2I_MULTI;
 
-            Station.tx_rpy              = ((float) v2sframe.twist_x_int)    / LIN_VEL_F2I_MULTI;
-            Station.tyaw_rpy            = ((float) v2sframe.twist_yaw_int)  / YAW_F2I_MULTI;
+            // Station.tx_rpy              = ((float) v2sframe.twist_x_int)    / LIN_VEL_F2I_MULTI;
+            // Station.tyaw_rpy            = ((float) v2sframe.twist_yaw_int)  / YAW_F2I_MULTI;
+            Station.throttle_percent    = ((float) v2sframe.throttle_percent_int) / 128.0;
+            Station.steer_percent       = ((float) v2sframe.steer_percent_int) / 128.0;
             Station.dist2goal           = ((float) v2sframe.dist2goal_int)  / XY_F2I_MULTI;
             Station.waypoint_index      = v2sframe.waypoint_index;
             Station.waypoint_list_sz    = v2sframe.waypoint_list_sz;
@@ -245,10 +248,10 @@ static void update_communication(int64_t timestamp) {
             Station.status.sync_with_vehicle = 1;
         } else {
             // If incoming data is out-of-date or frame header mismatch:
-            // Station.status.sync_with_vehicle = 0;
+            Station.status.sync_with_vehicle = 0;
         }
     } else {
-        // Station.status.sync_with_vehicle = 0;
+        Station.status.sync_with_vehicle = 0;
         // delay(5);
     }
 

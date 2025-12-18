@@ -75,8 +75,11 @@ typedef struct __attribute__((__packed__)) __v2s_frame {
     int32_t ekf_vyaw_int;
     uint8_t left_pwm;
     uint8_t right_pwm;
-    int16_t twist_x_int;
-    int16_t twist_yaw_int;
+    // int16_t twist_x_int;
+    // int16_t twist_yaw_int;
+    // Feedback motion commands from vehicle to station for verify and visualize:
+    int8_t throttle_percent_int;
+    int8_t steer_percent_int;
 
     int8_t waypoint_index;
     int8_t waypoint_list_sz;
@@ -93,7 +96,7 @@ typedef struct {
     uint8_t cmd_auto_mode:          1;
     uint8_t cmd_navigate_start:     1;
     uint8_t cmd_navigate_cancel:    1;
-    uint8_t cmd_sync_timestamp:     1;
+    // uint8_t cmd_sync_timestamp:     1;
     uint8_t cmd_set_origin:         1;
 } s2v_status_t;
 

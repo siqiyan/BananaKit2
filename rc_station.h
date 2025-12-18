@@ -50,7 +50,7 @@ typedef struct {
 typedef struct __rc_station__ {
     rc_station_status_t status;
     float               twist_x, twist_yaw;
-    float               tx_rpy, tyaw_rpy;
+    // float               tx_rpy, tyaw_rpy;
     int16_t             battery_adc_value;
     geo_coordinate_t    vehicle_coordinate;
     int16_t             joy_neutral_pos_x;
