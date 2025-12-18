@@ -56,6 +56,8 @@ typedef struct __rc_station__ {
     int16_t             joy_neutral_pos_x;
     int16_t             joy_neutral_pos_y;
     uint8_t             gear;
+    float               throttle_percent;
+    float               steer_percent;
     float               ekf_x;
     float               ekf_y;
     float               ekf_yaw;

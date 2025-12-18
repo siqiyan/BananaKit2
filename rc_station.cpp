@@ -148,6 +148,7 @@ static void update_keyboard_inputs(void) {
     } else {
         axis_range_f = (float) Station.joy_neutral_pos_y;
     }
+    Station.steer_percent = analog_value_f / axis_range_f;
     Station.twist_yaw = analog_value_f / axis_range_f * MAX_ANGULAR_VEL;
 
     // Compute speed limit values:
@@ -178,6 +179,7 @@ static void update_keyboard_inputs(void) {
     } else {
         axis_range_f = (float) Station.joy_neutral_pos_x;
     }
+    Station.throttle_percent = analog_value_f / axis_range_f;
     Station.twist_x = analog_value_f / axis_range_f * max_linear_velocity;
 
     // Detect push button press event:
@@ -445,7 +447,7 @@ static void render(void) {
             snprintf(
                 IO.lcd_buf,
                 LCD_BUF_SIZE,
-                "BATT:%s      GPS:%s",
+                "BATT:%s     GPS:%s",
                 Station.status.sync_with_vehicle ? floatbuf : "NA",
                 Station.status.gps_data_valid ? "OK" : "OFF"
             );
@@ -488,7 +490,7 @@ static void render(void) {
             snprintf(
                 IO.lcd_buf,
                 LCD_BUF_SIZE,
-                "MODE:%s      NAV:%s",
+                "MODE:%s    NAV:%s",
                 Station.status.cmd_auto_mode ? "AUTO" : "MANU",
                 Station.status.navigate_running ? "ON " : "OFF"
             );
@@ -728,119 +730,70 @@ static void render(void) {
 
 static void generate_steer_effect(char *out, int sz) {
     // Generate the following effect in the output buffer:
-    // ====================
-    //  <<<<< STEER >>>>>    
-    // ====================
-    // ^    ^ ^     ^     ^
-    // 0    m k     n     19
-    const int m = 5;
-    const int n = 13;
-    const int k = 7;
-    // char floatbuf[20];
+    //  <<<<< ROTATE >>>>>    
+    // ^    ^ ^      ^    ^
+    // 0    5 7      14   19
     char arrows[6];
     int i;
-    int num_arrows = (int) (fabs(Station.twist_yaw) / MAX_ANGULAR_VEL * 5.0);
-    
-    if(num_arrows < 0) {
-        num_arrows = 0;
-    } else if(num_arrows > 4) {
-        num_arrows = 4;
-    }
+    int num_arrows = (int) roundf(fabs(Station.steer_percent) * 6.0);
+    num_arrows = max(0, min(5, num_arrows));
 
-    // Clear output:
-    memset(arrows, ' ', 5);
-
-    if(Station.twist_yaw >= 0) {
+    if(Station.steer_percent >= 0) {
         // Right rotation
         for(i = 0; i < num_arrows; i++) {
             arrows[i] = '>';
         }
         arrows[i] = '\0';
-        snprintf(out, sz, "      STEER %s ", arrows);
+        snprintf(out, sz, "       ROTATE %s ", arrows);
     } else {
         // Left rotation
+        // <<<<<0
+        // ^    ^
+        // 0    5
+        for(i = 0; i < 5; i++) {
+            if(i >= 5 - num_arrows) {
+                arrows[i] = '<';
+            } else {
+                arrows[i] = ' ';
+            }
+        }
         for(i = 5 - num_arrows; i < 5; i++) {
             arrows[i] = '<';
         }
         arrows[i] = '\0';
-        snprintf(out, sz, " %s STEER", arrows);
+        snprintf(out, sz, " %s ROTATE", arrows);
     }
 }
 
 static void generate_throttle_effect(char *out, int sz) {
     // Generate the following effect in the output buffer:
-    // ====================
     // ACCEL+++++   GEAR:5
-    // ====================
+    // REVER+++++   GEAR:5
     // ^    ^   ^   ^     ^
     // 0    a   b   c     19
 
-    // ====================
-    // REVER+++++   GEAR:5
-    // ====================
-
-    const int a = 5;
-    const int b = 9;
-    const int c = 13;
-    float max_linear_velocity;
-    // int m = (int) (fabs(Station.tx_rpy) / MAX_ANGULAR_VEL * 5.0);
-    int m;
+    int num_arrows;
     int i;
     char arrows[6];
 
-    switch(Station.gear) {
-        case 0:
-            max_linear_velocity = GEAR0_SPEED;
-            break;
-        case 1:
-            max_linear_velocity = GEAR1_SPEED;
-            break;
-        case 2:
-            max_linear_velocity = GEAR2_SPEED;
-            break;
-        case 3:
-            max_linear_velocity = GEAR3_SPEED;
-            break;
-        case 4:
-            max_linear_velocity = GEAR4_SPEED;
-            break;
-        default:
-            max_linear_velocity = 0.0;
-            break;
-    }
-    m = (int) (fabs(Station.twist_x) / max_linear_velocity * 5.0);
-    
-    if(m < 0) {
-        m = 0;
-    } else if(m > 4) {
-        m = 4;
-    }
+    num_arrows = (int) roundf(fabs(Station.throttle_percent) * 6.0);
+    num_arrows = max(0, min(5, num_arrows));
 
     // Clear output:
-    // memset(out, ' ', sz);
     memset(arrows, ' ', 6);
 
-    for(i = 0; i < m; i++) {
+    for(i = 0; i < num_arrows; i++) {
         arrows[i] = '+';
     }
     arrows[5] = '\0';
 
-    if(Station.twist_x >= 0) {
+    if(Station.throttle_percent >= 0) {
         // Forward acceleration
-        // strncpy(out, "ACCEL", sz);
         snprintf(out, sz, "ACCEL%s    GEAR:%d", arrows, Station.gear);
     } else {
         // Reverse
-        // strncpy(out, "REVER", sz);
         snprintf(out, sz, "REVER%s    GEAR:%d", arrows, Station.gear);
     }
-
-    // for(i = a; i < m; i++) {
-    //     out[i] = '+';
-    // }
-
-    // snprintf(out+c, sz-c, "GEAR:%d", Station.gear);
-    // out[sz-1] = '\0';
 }
 
 #endif
