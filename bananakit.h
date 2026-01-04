@@ -56,6 +56,7 @@
 // nrf24 module:
 #define NRF24_CE_PIN        10
 #define NRF24_CSN_PIN       9
+#define NRF24_IRQ_PIN       3
 
 // Ublox GT-U7 GPS module:
 #define GT_U7_RX            5

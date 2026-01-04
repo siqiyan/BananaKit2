@@ -11,8 +11,9 @@
 #include "gnss_reader.h"
 
 // #define UART_SPEED_BPS 115200
-#define MAIN_LOOP_PERIOD        100 // ms, 100ms = 10Hz
-#define RENDER_LOOP_PERIOD      500 // 2Hz
+#define MAIN_LOOP_PERIOD        100 // 10Hz, 100ms period
+#define MAIN_LOOP_MAX           150 // upper bound, trigger warning
+// #define RENDER_LOOP_PERIOD      500 // 2Hz
 
 typedef enum {
     SM_UNCONNECT,
@@ -34,6 +35,7 @@ typedef struct {
     uint8_t gps_data_valid:         1;
     uint8_t gps_initialized:        1;
     uint8_t gps_origin_set:         1;
+    uint8_t s2v_received:           1;
     uint8_t cmd_auto_mode:          1;
     uint8_t cmd_navigate_start:     1;
     uint8_t cmd_navigate_cancel:    1;
@@ -50,14 +52,16 @@ typedef struct {
 typedef struct __rc_station__ {
     rc_station_status_t status;
     float               twist_x, twist_yaw;
-    // float               tx_rpy, tyaw_rpy;
+    float               twist_x_reply, twist_yaw_reply;
     int16_t             battery_adc_value;
     geo_coordinate_t    vehicle_coordinate;
     int16_t             joy_neutral_pos_x;
     int16_t             joy_neutral_pos_y;
     uint8_t             gear;
-    float               throttle_percent;
-    float               steer_percent;
+    // float               throttle_percent;
+    // float               steer_percent;
+    // int8_t              throttle_percent_int;
+    // int8_t              steer_percent_int;
     float               ekf_x;
     float               ekf_y;
     float               ekf_yaw;
@@ -70,6 +74,8 @@ typedef struct __rc_station__ {
     int8_t              waypoint_index;
     int8_t              waypoint_list_sz;
     uint8_t             debug_code;
+    int32_t             recv_frame_counter;
+    int16_t             packet_timeout_counter;
     station_state_machine_t  sm_state;
 } rc_station_t;
 

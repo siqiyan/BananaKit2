@@ -2,6 +2,7 @@
 #define __BANANAKIT_MISC__
 
 #include <stdint.h>
+#include <stddef.h>
 #include "callstack.h"
 #include "menu.h"
 // #include "bananakit.h"

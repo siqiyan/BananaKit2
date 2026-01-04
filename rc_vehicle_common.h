@@ -14,10 +14,10 @@
 #define MAX_NAVIGATION_RANGE        200.0   // meter
 #define SPEED_REDUCTION_RANGE       3.0     // meter, full speed if goal dist exceed this range
 #define GOAL_REACH_RANGE            0.5     // meter, tolerance value to determine if goal is reached range
-#define MAX_LINEAR_VEL              0.5     // meter/sec for auto mode
-#define MIN_LINEAR_VEL              0.1     // meter/sec, reduction speed, for auto mode
-#define MAX_ANGULAR_VEL             3.14    // rad/s, auto mode and manual mode
-#define RAMP_LINEAR_ACCEL           0.1     // meter/sec^2
+#define MAX_LINEAR_VEL              0.08     // meter/sec for auto mode
+#define MIN_LINEAR_VEL              0.02     // meter/sec, reduction speed, for auto mode
+#define MAX_ANGULAR_VEL             0.785    // rad/s, auto mode and manual mode
+#define RAMP_LINEAR_ACCEL           5.0     // meter/sec^2
 #define MAX_WAYPOINT_SZ             10
 
 // Manual speed at different gear level:
@@ -48,46 +48,64 @@
 
 #include <stdint.h>
 #define FRAME_HEADER_ID         0xA0
-// (wireless) Vehicle-to-Station dataframe:
-// (nRF24 has built-in checksum verification)
+
 typedef struct {
     uint8_t navigate_running:       1;
     uint8_t gps_data_valid:         1;
     uint8_t gps_initialized:        1;
     uint8_t lat_north_positive:     1;
     uint8_t lon_east_positive:      1;
-} v2s_status_t;
+    uint8_t s2v_received:           1;
+} vehicle_status_bit_t;
 
-typedef struct __attribute__((__packed__)) __v2s_frame {
+typedef struct __attribute__((__packed__)) {
     uint8_t header;         // header identifier, set to FRAME_HEADER_ID
-    v2s_status_t status;
-    int64_t timestamp;
+    vehicle_status_bit_t status;
     int32_t sequence_id;
-
-    int16_t lat_degree;
-    int16_t lon_degree;
-    int32_t lat_minute_int;
-    int32_t lon_minute_int;
-    int32_t ekf_x_int;
-    int32_t ekf_y_int;
-    int32_t ekf_yaw_int;
-    int32_t ekf_v_int;
-    int32_t ekf_vyaw_int;
+    // int32_t timestamp;
+    // float lat_minute;
+    // float lon_minute;
+    // int16_t lat_degree;
+    // int16_t lon_degree;
+    int16_t battery_adc_value;
+    // int8_t throttle_percent_int;
+    // int8_t steer_percent_int;
+    // float twist_x_reply;
+    // float twist_yaw_reply;
     uint8_t left_pwm;
     uint8_t right_pwm;
+    uint8_t debug_code;
+    uint8_t checksum;
+
+    // Note: the maximum data frame size os 32 bytes for nrf24 module:
+
+    // int32_t sequence_id;
+    // int32_t lat_minute_int;
+    // int32_t lon_minute_int;
+    // int32_t ekf_x_int;
+    // int32_t ekf_y_int;
+    // int32_t ekf_yaw_int;
+    // int32_t ekf_v_int;
+    // int32_t ekf_vyaw_int;
+    // int8_t throttle_percent_int;
+    // int8_t steer_percent_int;
+    // int32_t dist2goal_int;
+    // float ekf_x;
+    // float ekf_y;
+    // float ekf_yaw;
+    // float ekf_v;
+    // float ekf_vyaw;
+    // float dist2goal;
+    // uint8_t left_pwm;
+    // uint8_t right_pwm;
     // int16_t twist_x_int;
     // int16_t twist_yaw_int;
-    // Feedback motion commands from vehicle to station for verify and visualize:
-    int8_t throttle_percent_int;
-    int8_t steer_percent_int;
-
-    int8_t waypoint_index;
-    int8_t waypoint_list_sz;
-    int32_t delta_ms;
-    int32_t dist2goal_int;
-    int16_t battery_adc_value;
-    uint8_t debug_code;
-} v2s_frame_t;
+    // float throttle_percent;
+    // float steer_percent;
+    // int8_t waypoint_index;
+    // int8_t waypoint_list_sz;
+    // int32_t delta_ms;
+} vehicle_status_t;
 
 // (wireless) Station-to-Vehicle dataframe:
 // (nRF24 has built-in checksum verification)
@@ -98,17 +116,21 @@ typedef struct {
     uint8_t cmd_navigate_cancel:    1;
     // uint8_t cmd_sync_timestamp:     1;
     uint8_t cmd_set_origin:         1;
-} s2v_status_t;
+} command_bit_t;
 
-typedef struct __attribute__((__packed__)) __s2v_frame {
+typedef struct __attribute__((__packed__)) {
     uint8_t header;         // header identifier, set to FRAME_HEADER_ID
-    s2v_status_t status;
-    int64_t timestamp;
+    command_bit_t status;
+    int32_t timestamp;
     int32_t sequence_id;
-    int16_t twist_x_int;
-    int16_t twist_yaw_int;
-    uint8_t gear;
-} s2v_frame_t;
+    // int16_t twist_x_int;
+    // int16_t twist_yaw_int;
+    float twist_x;
+    float twist_yaw;
+    int8_t gear;
+
+    uint8_t checksum;
+} command_frame_t;
 
 // (UART) Station-to-laptop dataframe:
 // typedef struct __attribute__((__packed__)) __s2l_frame {
