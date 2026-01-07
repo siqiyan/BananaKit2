@@ -46,6 +46,7 @@ typedef struct {
     uint8_t func_key1_pressed:      1;
     uint8_t func_key2_pressed:      1;
     uint8_t func_key3_pressed:      1;
+    uint8_t recv_header_err:        1;
 } rc_station_status_t;
 
 // RC station variables:

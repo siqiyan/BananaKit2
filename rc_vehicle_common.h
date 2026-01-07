@@ -3,6 +3,8 @@
 #ifndef __RC_VEHICLE_COMMON__
 #define __RC_VEHICLE_COMMON__
 
+#include <stdint.h>
+
 // Hardware addresses:
 #define NRF24_ADDR_BASE         "00001"
 #define NRF24_ADDR_VEHICLE      "00002"
@@ -46,89 +48,94 @@
 #define ADC_R2                  10000.0
 #define GET_ADC_VOLT(x)         (x * REF_VOLTAGE / 1024.0 * (ADC_R1 + ADC_R2) / ADC_R2)
 
-#include <stdint.h>
-#define FRAME_HEADER_ID         0xA0
-
-typedef struct {
-    uint8_t navigate_running:       1;
-    uint8_t gps_data_valid:         1;
-    uint8_t gps_initialized:        1;
-    uint8_t lat_north_positive:     1;
-    uint8_t lon_east_positive:      1;
-    uint8_t s2v_received:           1;
-} vehicle_status_bit_t;
+// --------------------------------------------------------------------------------------------
+// Communication data structure definations:
+// Note: the maximum data frame size os 32 bytes for nrf24 module:
+#define FRAMEID_VEHICLE_STATUS          0xA0
+#define FRAMEID_GPS_STATUS              0xA1
+#define FRAMEID_EKF_STATUS              0xA2
+#define FRAMEID_NAVIGATION_STATUS       0XA3
+#define FRAMEID_COMMAND                 0xA4
 
 typedef struct __attribute__((__packed__)) {
-    uint8_t header;         // header identifier, set to FRAME_HEADER_ID
-    vehicle_status_bit_t status;
-    int32_t sequence_id;
-    // int32_t timestamp;
-    // float lat_minute;
-    // float lon_minute;
-    // int16_t lat_degree;
-    // int16_t lon_degree;
-    int16_t battery_adc_value;
-    // int8_t throttle_percent_int;
-    // int8_t steer_percent_int;
-    // float twist_x_reply;
-    // float twist_yaw_reply;
+    uint8_t header;
+    typedef struct {
+        uint8_t left_dir:       1;
+        uint8_t right_dir:      1;      
+    } status;
+    int16_t sequence_id;
+    float cmd_x;
+    float cmd_yaw;
     uint8_t left_pwm;
     uint8_t right_pwm;
     uint8_t debug_code;
+    int16_t battery_adc_value;
     uint8_t checksum;
-
-    // Note: the maximum data frame size os 32 bytes for nrf24 module:
-
-    // int32_t sequence_id;
-    // int32_t lat_minute_int;
-    // int32_t lon_minute_int;
-    // int32_t ekf_x_int;
-    // int32_t ekf_y_int;
-    // int32_t ekf_yaw_int;
-    // int32_t ekf_v_int;
-    // int32_t ekf_vyaw_int;
-    // int8_t throttle_percent_int;
-    // int8_t steer_percent_int;
-    // int32_t dist2goal_int;
-    // float ekf_x;
-    // float ekf_y;
-    // float ekf_yaw;
-    // float ekf_v;
-    // float ekf_vyaw;
-    // float dist2goal;
-    // uint8_t left_pwm;
-    // uint8_t right_pwm;
-    // int16_t twist_x_int;
-    // int16_t twist_yaw_int;
-    // float throttle_percent;
-    // float steer_percent;
-    // int8_t waypoint_index;
-    // int8_t waypoint_list_sz;
-    // int32_t delta_ms;
 } vehicle_status_t;
 
-// (wireless) Station-to-Vehicle dataframe:
-// (nRF24 has built-in checksum verification)
-typedef struct {
-    uint8_t cmd_estop:              1;
-    uint8_t cmd_auto_mode:          1;
-    uint8_t cmd_navigate_start:     1;
-    uint8_t cmd_navigate_cancel:    1;
-    // uint8_t cmd_sync_timestamp:     1;
-    uint8_t cmd_set_origin:         1;
-} command_bit_t;
+typedef struct __attribute__((__packed__)) {
+    uint8_t header;
+
+    struct __attribute__((__packed__)) {
+        uint8_t gps_data_valid:         1;
+        uint8_t gps_initialized:        1;
+        uint8_t lat_north_positive:     1;
+        uint8_t lon_east_positive:      1;
+        uint8_t reserved:               4; // fill the byte
+    } status;
+
+    int16_t sequence_id;
+    int16_t lat_degree;
+    int16_t lon_degree;
+    float lat_minute;
+    float lon_minute;
+    uint8_t checksum;
+} gps_status_t;
 
 typedef struct __attribute__((__packed__)) {
-    uint8_t header;         // header identifier, set to FRAME_HEADER_ID
-    command_bit_t status;
-    int32_t timestamp;
-    int32_t sequence_id;
+    uint8_t header;
+    int16_t sequence_id;
+    float ekf_x;
+    float ekf_y;
+    float ekf_yaw;
+    float ekf_v;
+    float ekf_vyaw;
+    uint8_t checksum;
+} ekf_status_t;
+
+typedef struct __attribute__((__packed__)) {
+    uint8_t header;
+
+    struct __attribute__((__packed__)) {
+        uint8_t navigate_running:       1;
+        uint8_t reserved:               7;
+    } status;
+
+    int16_t sequence_id;
+    float dist2goal;
+    int8_t waypoint_index;
+    int8_t waypoint_list_sz;
+    uint8_t checksum;
+} navigation_status_t;
+
+typedef struct __attribute__((__packed__)) {
+    uint8_t header;
+
+    struct __attribute__((__packed__)) {
+        uint8_t cmd_estop:              1;
+        uint8_t cmd_auto_mode:          1;
+        uint8_t cmd_navigate_start:     1;
+        uint8_t cmd_navigate_cancel:    1;
+        uint8_t cmd_set_origin:         1;
+        uint8_t reserved:               3;
+    } status;
+
+    int16_t sequence_id;
     // int16_t twist_x_int;
     // int16_t twist_yaw_int;
     float twist_x;
     float twist_yaw;
     int8_t gear;
-
     uint8_t checksum;
 } command_frame_t;
 

@@ -23,7 +23,10 @@ static void render(void);
 static void generate_steer_effect(char *out, int sz);
 static void generate_throttle_effect(char *out, int sz);
 static void generate_cmd_packet(command_frame_t *frame);
-static void proccess_status_packet(const vehicle_status_t *frame);
+static void process_status_packet(const vehicle_status_t *frame);
+static void process_gps_frame(const gps_status_t *frame);
+static void process_ekf_frame(const ekf_status_t *frame);
+static void process_navi_frame(const navigation_status_t *frame);
 
 extern callstack_t Callstack;
 extern bananakit_io_t IO;
@@ -32,11 +35,12 @@ static rc_station_t Station;
 static command_frame_t AckPacket;
 static int32_t __Timestamp, currTimestamp;
 static int32_t prevUpdateTimestamp, prevRenderTimestamp;
-static int32_t sequenceID;
+static int16_t sequenceID;
 static int16_t frameCounter;
 static uint8_t iterCounter;
 static uint8_t warnIter;
 static uint8_t newPacketEvent;
+static int32_t LostPacketCounter;
 
 static void incoming_packet_handle() {
     newPacketEvent = 1;
@@ -75,13 +79,14 @@ void rc_station_init(void) {
     prevUpdateTimestamp     = 0;
     prevRenderTimestamp     = 0;
     sequenceID              = 0;
+    LostPacketCounter       = 0;
     frameCounter            = 0;
     iterCounter             = 0;
     warnIter                = 9;
 
     // Init rc station variables:
     memset(&Station.status, 0, sizeof(rc_station_status_t)); // clear all status bits
-    // Station.status.sync_with_vehicle    = 0;
+    Station.status.sync_with_vehicle    = 1;
     Station.twist_x                     = 0.0;
     Station.twist_yaw                   = 0.0;
     // Station.tx_rpy                      = 0.0;
@@ -122,7 +127,6 @@ node_status_t rc_station_update(void) {
     }
 
     update_state_machine();
-    // update_communication();
     update_communication_irq();
     update_keyboard_inputs();
 
@@ -131,91 +135,6 @@ node_status_t rc_station_update(void) {
 
         prevRenderTimestamp = currTimestamp;
     }
-
-    // Balance CPU load
-    // Simple scheduling table (loop rate 10Hz, each iter%10 run at 1Hz, can control task range 1-10Hz with step size 1Hz):
-    // ---------------------------------------
-    // Iter%10  Task
-    // 0        update sm, communicate
-    // 1        update sm, update keyboard
-    // 2        update sm, communicate
-    // 3        update sm, render
-    // 4        update sm, communicate
-    // 5        update sm, update keyboard
-    // 6        update sm, communicate
-    // 7        update sm,
-    // 8        update sm, communicate
-    // 9        update sm, 
-    // ---------------------------------------
-    // Task         frequency(Hz)
-    // update sm    10
-    // recv         2
-    // send         4
-    // render       2
-    // update kb    2
-
-    // if(currTimestamp - prevUpdateTimestamp >= MAIN_LOOP_PERIOD) {
-    //     if(currTimestamp - prevUpdateTimestamp >= MAIN_LOOP_MAX) {
-    //         // Previous task triggered max loop interval warning
-    //         snprintf(
-    //             IO.lcd_buf,
-    //             LCD_BUF_SIZE,
-    //             "load warn:%d",
-    //             warnIter
-    //         );
-    //         IO.flags = LCD_REFRESH_LINE0;
-    //         IO.lcd_refresh_callback();
-    //     }
-    //     warnIter = iterCounter;
-
-    //     switch(iterCounter) {
-    //         case 0:
-    //             update_state_machine();
-    //             update_communication();
-    //             break;
-    //         case 1:
-    //             update_state_machine();
-    //             update_communication();
-    //             break;
-    //         case 2:
-    //             update_state_machine();
-    //             update_communication();
-    //             update_keyboard_inputs();
-    //             break;
-    //         case 3:
-    //             update_state_machine();
-    //             update_communication();
-    //             break;
-    //         case 4:
-    //             render();
-    //             break;
-    //         case 5:
-    //             update_state_machine();
-    //             update_communication();
-    //             break;
-    //         case 6:
-    //             update_state_machine();
-    //             update_communication();
-    //             break;
-    //         case 7:
-    //             update_state_machine();
-    //             update_communication();
-    //             update_keyboard_inputs();
-    //             break;
-    //         case 8:
-    //             update_state_machine();
-    //             update_communication();
-    //             break;
-    //         case 9:
-    //             render();
-    //             break;
-    //         default:
-    //             break;
-    //     }
-
-    //     prevUpdateTimestamp = currTimestamp;
-    //     iterCounter = (iterCounter + 1) % 10;
-    // }
 
     switch(IO.keypress) {
         case PIC_POWER:
@@ -322,90 +241,83 @@ static void update_keyboard_inputs(void) {
     // }
 }
 
-static void proccess_status_packet(const vehicle_status_t *frame) {
-    // Verify checksum:
+static void process_status_packet(const vehicle_status_t *frame) {
     if(compute_checksum((char *) frame, sizeof(vehicle_status_t)) != frame->checksum) {
-        // Checksum mismatch
-        // snprintf(
-        //     IO.lcd_buf,
-        //     LCD_BUF_SIZE,
-        //     "checksum err"
-        // );
-        // IO.flags = LCD_REFRESH_LINE0;
-        // IO.lcd_refresh_callback();
         return;
     }
+    if(frame->sequence_id != sequenceID) {
+        LostPacketCounter++;
+        sequenceID = frame->sequence_id;
+    }
+    sequenceID++;
 
-    if(frame->header != FRAME_HEADER_ID) {
-        // Header mismatch
+    Station.twist_x_reply       = frame->cmd_x;
+    Station.twist_yaw_reply     = frame->cmd_yaw;
+    Station.left_pwm            = frame->left_pwm;
+    Station.right_pwm           = frame->right_pwm;
+    Station.debug_code          = frame->debug_code;
+    Station.battery_adc_value   = frame->battery_adc_value;
+}
+
+static void process_gps_frame(const gps_status_t *frame) {
+    if(compute_checksum((char *) frame, sizeof(gps_status_t)) != frame->checksum) {
         return;
     }
+    if(frame->sequence_id != sequenceID) {
+        LostPacketCounter++;
+        sequenceID = frame->sequence_id;
+    }
+    sequenceID++;
 
-    // if(Station.status.sync_with_vehicle && abs(currTimestamp - frame->timestamp) > 100) {
-    //     // Established connection but packet timeout:
-    //     Station.packet_timeout_counter++;
-    //     if(Station.packet_timeout_counter > 20) {
-    //         Station.status.sync_with_vehicle = 0;
-    //     }
-    //     return;
-    // }
-
-    // Unpack received data:
-    Station.status.navigate_running                 = frame->status.navigate_running;
     Station.status.gps_initialized                  = frame->status.gps_initialized;
     Station.status.gps_data_valid                   = frame->status.gps_data_valid;
-    Station.status.s2v_received                     = frame->status.s2v_received;
     Station.vehicle_coordinate.lat_north_positive   = frame->status.lat_north_positive;
     Station.vehicle_coordinate.lon_east_positive    = frame->status.lon_east_positive;
-    // Station.vehicle_coordinate.lat_degree           = frame.lat_degree;
-    // Station.vehicle_coordinate.lon_degree           = frame.lon_degree;
-    // Station.vehicle_coordinate.lat_minute           = ((float) frame.lat_minute_int) / GPS_F2I_MULTI;
-    // Station.vehicle_coordinate.lon_minute           = ((float) frame.lon_minute_int) / GPS_F2I_MULTI;
-    // Station.vehicle_coordinate.lat_minute           = frame.lat_minute;
-    // Station.vehicle_coordinate.lon_minute           = frame.lon_minute;
+    Station.vehicle_coordinate.lat_degree           = frame->lat_degree;
+    Station.vehicle_coordinate.lon_degree           = frame->lon_degree;
+    Station.vehicle_coordinate.lat_minute           = frame->lat_minute;
+    Station.vehicle_coordinate.lon_minute           = frame->lon_minute;
+}
 
+static void process_ekf_frame(const ekf_status_t *frame) {
+    if(compute_checksum((char *) frame, sizeof(ekf_status_t)) != frame->checksum) {
+        return;
+    }
+    if(frame->sequence_id != sequenceID) {
+        LostPacketCounter++;
+        sequenceID = frame->sequence_id;
+    }
+    sequenceID++;
     // Station.ekf_x       = ((float) frame.ekf_x_int)      / XY_F2I_MULTI;
     // Station.ekf_y       = ((float) frame.ekf_y_int)      / XY_F2I_MULTI;
     // Station.ekf_yaw     = ((float) frame.ekf_yaw_int)    / YAW_F2I_MULTI;
     // Station.ekf_vyaw    = ((float) frame.ekf_vyaw_int)   / ANG_VEL_F2I_MULTI;
     // Station.ekf_v       = ((float) frame.ekf_v_int)      / LIN_VEL_F2I_MULTI;
-    // Station.ekf_x       = frame.ekf_x;
-    // Station.ekf_y       = frame.ekf_y;
-    // Station.ekf_yaw     = frame.ekf_yaw;
-    // Station.ekf_vyaw    = frame.ekf_vyaw;
-    // Station.ekf_v       = frame.ekf_v;
+    Station.ekf_x       = frame->ekf_x;
+    Station.ekf_y       = frame->ekf_y;
+    Station.ekf_yaw     = frame->ekf_yaw;
+    Station.ekf_vyaw    = frame->ekf_vyaw;
+    Station.ekf_v       = frame->ekf_v;
+}
 
-    // Station.throttle_percent_int    = ((float) frame.throttle_percent_int) / 128.0;
-    // Station.steer_percent_int       = ((float) frame.steer_percent_int) / 128.0;
-    // Station.dist2goal           = ((float) frame.dist2goal_int)  / XY_F2I_MULTI;
-    // Station.throttle_percent    = frame.throttle_percent;
-    // Station.steer_percent       = frame.steer_percent;
-    // Station.dist2goal           = frame.dist2goal;
-    // Station.twist_x_reply          = frame->twist_x_reply;
-    // Station.twist_yaw_reply        = frame->twist_yaw_reply;
-
-    // Station.waypoint_index      = frame.waypoint_index;
-    // Station.waypoint_list_sz    = frame.waypoint_list_sz;
-    Station.left_pwm            = frame->left_pwm;
-    Station.right_pwm           = frame->right_pwm;
-    Station.debug_code          = frame->debug_code;
-    Station.battery_adc_value   = frame->battery_adc_value;
-    // Station.delta_ms            = frame.delta_ms;
-    // Station.recv_frame_counter  = frame.sequence_id;
-    Station.status.sync_with_vehicle = 1;
-    Station.packet_timeout_counter = 0;
-
-    // snprintf(
-    //     IO.lcd_buf,
-    //     LCD_BUF_SIZE,
-    //     "recv success"
-    // );
-    // IO.flags = LCD_REFRESH_LINE0;
-    // IO.lcd_refresh_callback();
+static void process_navi_frame(const navigation_status_t *frame) {
+    if(compute_checksum((char *) frame, sizeof(navigation_status_t)) != frame->checksum) {
+        return;
+    }
+    if(frame->sequence_id != sequenceID) {
+        LostPacketCounter++;
+        sequenceID = frame->sequence_id;
+    }
+    sequenceID++;
+    Station.status.navigate_running     = frame->status.navigate_running;
+    Station.dist2goal                   = frame->dist2goal;
+    Station.waypoint_index              = frame->waypoint_index;
+    Station.waypoint_list_sz            = frame->waypoint_list_sz;
 }
 
 static void update_communication_irq(void) {
-    vehicle_status_t recv_frame;
+    uint8_t recv_buf[32];
+    uint8_t sz;
 
     if(newPacketEvent) {
         newPacketEvent = 0;
@@ -413,12 +325,38 @@ static void update_communication_irq(void) {
 
         // Station do not send any data and wait for vehicle packet arrives first:
         if(RF_radio.available()) {
-            RF_radio.read(&recv_frame, sizeof(vehicle_status_t));
+            sz = RF_radio.getDynamicPayloadSize();
+            if(sz < 1) {
+                // Corrupt packet:
+                return;
+            }
+
+            RF_radio.read(recv_buf, sz);
 
             // Auto ACK already replied by hardware, put a new ACK packet for next auto reply:
             RF_radio.writeAckPayload(1, &AckPacket, sizeof(command_frame_t));
 
-            proccess_status_packet(&recv_frame);
+            switch(recv_buf[0]) {
+                case FRAMEID_VEHICLE_STATUS:
+                    process_status_packet((const vehicle_status_t *) recv_buf);
+                    Station.status.recv_header_err = 0;
+                    break;
+                case FRAMEID_GPS_STATUS:
+                    process_gps_frame((const gps_status_t *) recv_buf);
+                    Station.status.recv_header_err = 0;
+                    break;
+                case FRAMEID_EKF_STATUS:
+                    process_ekf_frame((const ekf_status_t *) recv_buf);
+                    Station.status.recv_header_err = 0;
+                    break;
+                case FRAMEID_NAVIGATION_STATUS:
+                    process_navi_frame((const navigation_status_t *) recv_buf);
+                    Station.status.recv_header_err = 0;
+                    break;
+                default:
+                    // Error: header unrecognized
+                    Station.status.recv_header_err = 1;
+            }
         }
     }
 
@@ -428,7 +366,7 @@ static void update_communication_irq(void) {
 
 static void generate_cmd_packet(command_frame_t *frame) {
     // After established connection with vehicle, reply s2v packet to vehicle:
-    frame->header = FRAME_HEADER_ID;
+    frame->header = FRAMEID_COMMAND;
     // frame->timestamp = timestamp;
     // frame.sequence_id = frameCounter;
     frameCounter++;
