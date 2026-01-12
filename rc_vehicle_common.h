@@ -22,13 +22,6 @@
 #define RAMP_LINEAR_ACCEL           5.0     // meter/sec^2
 #define MAX_WAYPOINT_SZ             10
 
-// Manual speed at different gear level:
-// #define GEAR1_SPEED                 0.1
-// #define GEAR2_SPEED                 0.6
-// #define GEAR3_SPEED                 1.5
-// #define GEAR4_SPEED                 0.9
-// #define GEAR5_SPEED                 1.5
-
 // Convert between float and integer for data communication
 // After conversion to integer the number after float point will be discard during transmiting
 // To keep more precision increase the constant, but on Arduino Nano the total float precision is 6-7 digits (if I remember)
@@ -59,10 +52,13 @@
 
 typedef struct __attribute__((__packed__)) {
     uint8_t header;
-    typedef struct {
+
+    struct __attribute__((__packed__)) {
         uint8_t left_dir:       1;
         uint8_t right_dir:      1;      
+        uint8_t reserved:       6;
     } status;
+
     int16_t sequence_id;
     float cmd_x_reply;
     float cmd_yaw_reply;

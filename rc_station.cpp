@@ -25,7 +25,6 @@ static void generate_throttle_effect(char *out, int sz);
 static void generate_cmd_packet(command_frame_t *frame);
 static void process_status_packet(const vehicle_status_t *frame);
 static void process_gps_frame(const gps_status_t *frame);
-static void process_ekf_frame(const ekf_status_t *frame);
 static void process_navi_frame(const navigation_status_t *frame);
 
 extern callstack_t Callstack;
@@ -33,7 +32,7 @@ extern bananakit_io_t IO;
 static RF24 RF_radio(NRF24_CE_PIN, NRF24_CSN_PIN);
 static rc_station_t Station;
 static command_frame_t AckPacket;
-static int32_t __Timestamp, currTimestamp;
+static int32_t currTimestamp;
 static int32_t prevUpdateTimestamp, prevRenderTimestamp;
 static int16_t sequenceID;
 static int16_t frameCounter;
@@ -74,7 +73,6 @@ void rc_station_init(void) {
     );
 
     // Init global variables:
-    __Timestamp             = 0;
     currTimestamp           = 0;
     prevUpdateTimestamp     = 0;
     prevRenderTimestamp     = 0;
@@ -86,11 +84,7 @@ void rc_station_init(void) {
 
     // Init rc station variables:
     memset(&Station.status, 0, sizeof(rc_station_status_t)); // clear all status bits
-    Station.status.sync_with_vehicle    = 1;
-    // Station.twist_x                     = 0.0;
-    // Station.twist_yaw                   = 0.0;
-    // Station.tx_rpy                      = 0.0;
-    // Station.tyaw_rpy                    = 0.0;
+    Station.status.is_connected         = 0;
     Station.joy_neutral_pos_x           = 635;
     Station.joy_neutral_pos_y           = 645;
     Station.debug_code                  = 0;
@@ -117,7 +111,6 @@ void rc_station_init(void) {
 node_status_t rc_station_update(void) {
     node_status_t next_state = NODE_RUNNING;
 
-    // currTimestamp = __Timestamp;
     currTimestamp = millis();
     if(prevUpdateTimestamp == 0) {
         // First iteration, skip:
@@ -157,9 +150,6 @@ void rc_station_exit(void) {
 }
 
 void rc_station_interrupt(void) {
-    // ATOMIC_BLOCK(ATOMIC_FORCEON) {
-    //     __Timestamp++;
-    // }
 }
 
 
@@ -202,58 +192,9 @@ static void update_keyboard_inputs(void) {
         Station.gear = (uint8_t)map(raw_offset, DEADZONE_JOY, 1023, 0, 255);
     }
 
-    // Compute rotation twist command:
-    // analog_value_f = (float) (analogRead(JOY_VRY) - Station.joy_neutral_pos_y);
-    // if(analog_value_f >= 0) {
-    //     axis_range_f = 1024.0 - (float) Station.joy_neutral_pos_y;
-    // } else {
-    //     axis_range_f = (float) Station.joy_neutral_pos_y;
-    // }
-    // if(!Station.status.sync_with_vehicle) {
-    //     // Not receiving feedback command from vehicle, use local joystick command directly:
-    //     Station.steer_percent = analog_value_f / axis_range_f;
-    // }
-    // Station.twist_yaw = analog_value_f / axis_range_f * MAX_ANGULAR_VEL;
-    // Station.cmd_yaw = (int8_t) (analog_value_f / axis_range_f * 128.0);
-
-    // Compute speed limit values:
-    // raw_offset = analogRead(VOLT0_READ_PIN);
-    // if(raw_offset >= 0 && raw_offset < 400) {
-    //     Station.gear = 1;
-    //     // max_linear_velocity = GEAR0_SPEED;
-    // } else if(raw_offset >= 400 && raw_offset < 800) {
-    //     Station.gear = 2;
-    //     // max_linear_velocity = GEAR1_SPEED;
-    // // } else if(raw_offset >= 400 && raw_offset < 600) {
-    //     // Station.gear = 3;
-    //     // max_linear_velocity = GEAR2_SPEED;
-    // // } else if(raw_offset >= 600 && raw_offset < 800) {
-    //     // Station.gear = 4;
-    //     // max_linear_velocity = GEAR3_SPEED;
-    // } else if(raw_offset >= 800) {
-    //     Station.gear = 3;
-    //     // max_linear_velocity = GEAR4_SPEED;
-    // }
-    
-    // Compute longitudinal twist command:
-    // Longitudinal corresponds to joystick x-axis, positive value forward
-    // analog_value_f = (float) (analogRead(JOY_VRX) - Station.joy_neutral_pos_x);
-    // if(analog_value_f >= 0) {
-    //     axis_range_f = 1024.0 - (float) Station.joy_neutral_pos_x;
-    // } else {
-    //     axis_range_f = (float) Station.joy_neutral_pos_x;
-    // }
-    // if(!Station.status.sync_with_vehicle) {
-    //     // Not receiving feedback command from vehicle, use local joystick command directly:
-    //     Station.throttle_percent = analog_value_f / axis_range_f;
-    // }
-    // Station.twist_x = analog_value_f / axis_range_f * max_linear_velocity;
-    // Station.cmd_x = (int8_t) (analog_value_f / axis_range_f * 128.0);
-
     // Detect push button press event:
     Station.status.func_key1_pressed = 0;
     Station.status.func_key2_pressed = 0;
-    Station.status.func_key3_pressed = 0;
     if(digitalRead(JOY_PUSH_BUTTON_0) == LOW) {
         delay(20);
         if(digitalRead(JOY_PUSH_BUTTON_0) == LOW) {
@@ -266,12 +207,6 @@ static void update_keyboard_inputs(void) {
             Station.status.func_key2_pressed = 1;
         }
     }
-    // if(digitalRead(JOY_SW) == LOW) {
-    //     delay(20);
-    //     if(digitalRead(JOY_SW) == LOW) {
-    //         Station.status.func_key3_pressed = 1;
-    //     }
-    // }
 }
 
 static void process_status_packet(const vehicle_status_t *frame) {
@@ -284,12 +219,23 @@ static void process_status_packet(const vehicle_status_t *frame) {
     }
     sequenceID++;
 
-    Station.cmd_x_reply       = frame->cmd_x_reply;
-    Station.cmd_yaw_reply     = frame->cmd_yaw_reply;
-    Station.left_pwm            = frame->left_pwm;
-    Station.right_pwm           = frame->right_pwm;
-    Station.debug_code          = frame->debug_code;
-    Station.battery_adc_value   = frame->battery_adc_value;
+    Station.cmd_x_reply             = frame->cmd_x_reply;
+    Station.cmd_yaw_reply           = frame->cmd_yaw_reply;
+    Station.left_pwm                = frame->left_pwm;
+    Station.right_pwm               = frame->right_pwm;
+    if(frame->status.left_dir) {
+        Station.left_pwm_signed     = ((int16_t) frame->left_pwm);
+    } else {
+        Station.left_pwm_signed     = -((int16_t) frame->left_pwm);
+    }
+    if(frame->status.right_dir) {
+        Station.right_pwm_signed    = ((int16_t) frame->right_pwm);
+    } else {
+        Station.right_pwm_signed    = -((int16_t) frame->right_pwm);
+    }
+    Station.debug_code              = frame->debug_code;
+    Station.battery_adc_value       = frame->battery_adc_value;
+    Station.status.is_connected     = 1;
 }
 
 static void process_gps_frame(const gps_status_t *frame) {
@@ -310,22 +256,7 @@ static void process_gps_frame(const gps_status_t *frame) {
     Station.vehicle_coordinate.lon_degree           = frame->lon_degree;
     Station.vehicle_coordinate.lat_minute           = frame->lat_minute;
     Station.vehicle_coordinate.lon_minute           = frame->lon_minute;
-}
-
-static void process_ekf_frame(const ekf_status_t *frame) {
-    if(compute_checksum((char *) frame, sizeof(ekf_status_t)) != frame->checksum) {
-        return;
-    }
-    if(frame->sequence_id != sequenceID) {
-        LostPacketCounter++;
-        sequenceID = frame->sequence_id;
-    }
-    sequenceID++;
-    // Station.ekf_x       = frame->ekf_x;
-    // Station.ekf_y       = frame->ekf_y;
-    // Station.ekf_yaw     = frame->ekf_yaw;
-    // Station.ekf_vyaw    = frame->ekf_vyaw;
-    // Station.ekf_v       = frame->ekf_v;
+    Station.status.is_connected = 1;
 }
 
 static void process_navi_frame(const navigation_status_t *frame) {
@@ -341,6 +272,7 @@ static void process_navi_frame(const navigation_status_t *frame) {
     Station.dist2goal                   = frame->dist2goal;
     Station.waypoint_index              = frame->waypoint_index;
     Station.waypoint_list_sz            = frame->waypoint_list_sz;
+    Station.status.is_connected = 1;
 }
 
 static void update_communication_irq(void) {
@@ -373,10 +305,6 @@ static void update_communication_irq(void) {
                     process_gps_frame((const gps_status_t *) recv_buf);
                     Station.status.recv_header_err = 0;
                     break;
-                case FRAMEID_EKF_STATUS:
-                    process_ekf_frame((const ekf_status_t *) recv_buf);
-                    Station.status.recv_header_err = 0;
-                    break;
                 case FRAMEID_NAVIGATION_STATUS:
                     process_navi_frame((const navigation_status_t *) recv_buf);
                     Station.status.recv_header_err = 0;
@@ -395,23 +323,16 @@ static void update_communication_irq(void) {
 static void generate_cmd_packet(command_frame_t *frame) {
     // After established connection with vehicle, reply s2v packet to vehicle:
     frame->header = FRAMEID_COMMAND;
-    // frame->timestamp = timestamp;
-    // frame.sequence_id = frameCounter;
-    frameCounter++;
-
+    frame->sequence_id = frameCounter++;
     frame->status.cmd_navigate_start  = Station.status.cmd_navigate_start;
     frame->status.cmd_navigate_cancel = Station.status.cmd_navigate_cancel;
     frame->status.cmd_estop           = Station.status.cmd_estop;
     frame->status.cmd_auto_mode       = Station.status.cmd_auto_mode;
     frame->status.cmd_set_origin      = Station.status.cmd_set_origin;
-    // if(!Station.status.cmd_auto_mode) {
-        // frame.twist_x_int            = (int16_t) (Station.twist_x * LIN_VEL_F2I_MULTI);
-        // frame.twist_yaw_int          = (int16_t) (Station.twist_yaw * ANG_VEL_F2I_MULTI);
-    // }
-    // frame->twist_x            = Station.twist_x;
-    // frame->twist_yaw          = Station.twist_yaw;
-    frame->cmd_x_int                = Station.cmd_x_int;
-    frame->cmd_yaw_int              = Station.cmd_yaw_int;
+    if(!Station.status.cmd_auto_mode) {
+        frame->cmd_x_int                = Station.cmd_x_int;
+        frame->cmd_yaw_int              = Station.cmd_yaw_int;
+    }
     frame->gear                     = Station.gear;
     frame->checksum = compute_checksum((char *) frame, sizeof(command_frame_t));
 }
@@ -419,7 +340,7 @@ static void generate_cmd_packet(command_frame_t *frame) {
 static void update_state_machine(void) {
     switch(Station.sm_state) {
         case SM_UNCONNECT:
-            if(Station.status.sync_with_vehicle) {
+            if(Station.status.is_connected) {
                 Station.sm_state = SM_MANUAL;
             }
             break;
@@ -525,7 +446,7 @@ static void update_state_machine(void) {
             if(IO.keypress == PIC_PLUS) {
                 Station.sm_state = SM_DEBUG2;
             } else if(IO.keypress == PIC_MINUS) {
-                Station.sm_state = SM_DEBUG3;
+                Station.sm_state = SM_DEBUG2;
             } else if(IO.keypress == PIC_CHAOS) {
                 if(Station.status.navigate_running) {
                     Station.sm_state = SM_NAVIGATE1;
@@ -537,7 +458,7 @@ static void update_state_machine(void) {
 
         case SM_DEBUG2:
             if(IO.keypress == PIC_PLUS) {
-                Station.sm_state = SM_DEBUG3;
+                Station.sm_state = SM_DEBUG1;
             } else if(IO.keypress == PIC_MINUS) {
                 Station.sm_state = SM_DEBUG1;
             } else if(IO.keypress == PIC_CHAOS) {
@@ -549,19 +470,6 @@ static void update_state_machine(void) {
             }
             break;
 
-        case SM_DEBUG3:
-            if(IO.keypress == PIC_PLUS) {
-                Station.sm_state = SM_DEBUG1;
-            } else if(IO.keypress == PIC_MINUS) {
-                Station.sm_state = SM_DEBUG2;
-            } else if(IO.keypress == PIC_CHAOS) {
-                if(Station.status.navigate_running) {
-                    Station.sm_state = SM_NAVIGATE1;
-                } else {
-                    Station.sm_state = SM_MANUAL;
-                }
-            }
-            break;
     }
 }
 
@@ -584,8 +492,7 @@ static void render(void) {
                 IO.lcd_buf,
                 LCD_BUF_SIZE,
                 "BATT:%s     GPS:%s",
-                // Station.status.sync_with_vehicle ? Station.battery_adc_value : -1,
-                Station.status.sync_with_vehicle ? floatbuf : "NA",
+                Station.status.is_connected ? floatbuf : "NA",
                 Station.status.gps_data_valid ? "OK" : "OFF"
             );
             IO.flags = LCD_REFRESH_LINE0;
@@ -598,15 +505,6 @@ static void render(void) {
                 "GPS INIT:%d  VALID:%d",
                 Station.status.gps_initialized,
                 Station.status.gps_data_valid
-            );
-            IO.flags = LCD_REFRESH_LINE0;
-            IO.lcd_refresh_callback();
-            break;
-        case SM_DEBUG3:
-            snprintf(
-                IO.lcd_buf,
-                LCD_BUF_SIZE,
-                "EKF"
             );
             IO.flags = LCD_REFRESH_LINE0;
             IO.lcd_refresh_callback();
@@ -640,29 +538,10 @@ static void render(void) {
                 LCD_BUF_SIZE,
                 "ORIGIN:%d  SEQ:%d",
                 Station.status.gps_origin_set,
-                Station.recv_frame_counter
+                sequenceID
             );
             IO.flags = LCD_REFRESH_LINE1;
             IO.lcd_refresh_callback();
-            break;
-        case SM_DEBUG3:
-            // offset = 0;
-            // float2str(Station.ekf_x, floatbuf, LCD_BUF_SIZE, 2);
-            // offset += snprintf(
-            //     IO.lcd_buf+offset,
-            //     LCD_BUF_SIZE-offset,
-            //     "X:%s  ",
-            //     floatbuf
-            // );
-            // float2str(Station.ekf_y, floatbuf, LCD_BUF_SIZE, 2);
-            // offset += snprintf(
-            //     IO.lcd_buf+offset,
-            //     LCD_BUF_SIZE-offset,
-            //     "Y:%s",
-            //     floatbuf
-            // );
-            // IO.flags = LCD_REFRESH_LINE1;
-            // IO.lcd_refresh_callback();
             break;
         default:
             break;
@@ -684,10 +563,9 @@ static void render(void) {
             snprintf(
                 IO.lcd_buf,
                 LCD_BUF_SIZE,
-                "L:%d R:%d  s2v:%d",
-                Station.left_pwm,
-                Station.right_pwm,
-                Station.status.s2v_received
+                "L:%d       CONN:%d",
+                Station.left_pwm_signed,
+                Station.status.is_connected
             );
             IO.flags = LCD_REFRESH_LINE2;
             IO.lcd_refresh_callback();
@@ -704,25 +582,6 @@ static void render(void) {
             );
             IO.flags = LCD_REFRESH_LINE2;
             IO.lcd_refresh_callback();
-            break;
-        case SM_DEBUG3:
-            // offset = 0;
-            // float2str(Station.ekf_yaw, floatbuf, LCD_BUF_SIZE, 1);
-            // offset += snprintf(
-            //     IO.lcd_buf+offset,
-            //     LCD_BUF_SIZE-offset,
-            //     "Z:%s     ",
-            //     floatbuf
-            // );
-            // float2str(Station.ekf_vyaw, floatbuf, LCD_BUF_SIZE, 1);
-            // offset += snprintf(
-            //     IO.lcd_buf+offset,
-            //     LCD_BUF_SIZE-offset,
-            //     "VZ:%s",
-            //     floatbuf
-            // );
-            // IO.flags = LCD_REFRESH_LINE2;
-            // IO.lcd_refresh_callback();
             break;
         default:
             break;
@@ -759,8 +618,8 @@ static void render(void) {
             snprintf(
                 IO.lcd_buf,
                 LCD_BUF_SIZE,
-                "DT:%d      DEBUG:%d",
-                Station.delta_ms,
+                "R:%d     DEBUG:%d",
+                Station.right_pwm_signed,
                 Station.debug_code
             );
             IO.flags = LCD_REFRESH_LINE3;
@@ -779,17 +638,6 @@ static void render(void) {
             IO.flags = LCD_REFRESH_LINE3;
             IO.lcd_refresh_callback();
             break;
-        case SM_DEBUG3:
-            // float2str(Station.ekf_v, floatbuf, LCD_BUF_SIZE, 2);
-            // snprintf(
-            //     IO.lcd_buf,
-            //     LCD_BUF_SIZE,
-            //     "V:%s",
-            //     floatbuf
-            // );
-            // IO.flags = LCD_REFRESH_LINE3;
-            // IO.lcd_refresh_callback();
-            break;
         default:
             break;
     }
@@ -798,7 +646,7 @@ static void render(void) {
     // ====================
     // BATT:NA      GPS:NA
     // MODE:MANUAL  NAV:OFF
-    // ACCEL+++++   GEAR:10
+    // ACCEL+++++  GEAR:100
     //   *NOT CONNECTED*
     // ====================
 
@@ -806,7 +654,7 @@ static void render(void) {
     // ====================
     // BATT:11.6    GPS:OK
     // MODE:MANUAL  NAV:OFF
-    // REVER+++     GEAR:5
+    // REVER+++    GEAR:255
     //        STEER >>>
     // ====================
 
@@ -814,7 +662,7 @@ static void render(void) {
     // ====================
     // BATT:11.6    GPS:OK
     // MODE:MANUAL  NAV:OFF
-    // REVER        GEAR:5
+    // REVER       GEAR:255
     //    *** E-STOP ***
     // ====================
 
@@ -822,7 +670,7 @@ static void render(void) {
     // ====================
     // BATT:11.6    GPS:OK
     // MODE:AUTO    NAV:ON
-    // ACCEL+++     GEAR:5
+    // ACCEL+++    GEAR:255
     //        STEER >>>
     // ====================
 
@@ -846,8 +694,8 @@ static void render(void) {
     // ====================
     // BATT:11.6    GPS:OK
     // MODE:MANUAL  NAV:OFF
-    // L:-255 R:105  s2v:OK
-    //              DEBUG:2
+    // L:-255       CONN:OK
+    // R:100      DEBUG:128
     // ====================
 
     // Debug mode2 (SM_DEBUG2):
@@ -856,14 +704,6 @@ static void render(void) {
     // ORIGIN:1  SEQ:12345
     // LAT:51D35.12345M  N
     // LON:113D30.56123M W
-    // ====================
-
-    // Debug mode3 (SM_DEBUG3):
-    // ====================
-    // EKF
-    // X:20.12      Y:10.34
-    // Z:0.21     VZ:Z10.12
-    // V:0.2
     // ====================
 }
 
