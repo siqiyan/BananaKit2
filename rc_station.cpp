@@ -87,8 +87,8 @@ void rc_station_init(void) {
     // Init rc station variables:
     memset(&Station.status, 0, sizeof(rc_station_status_t)); // clear all status bits
     Station.status.sync_with_vehicle    = 1;
-    Station.twist_x                     = 0.0;
-    Station.twist_yaw                   = 0.0;
+    // Station.twist_x                     = 0.0;
+    // Station.twist_yaw                   = 0.0;
     // Station.tx_rpy                      = 0.0;
     // Station.tyaw_rpy                    = 0.0;
     Station.joy_neutral_pos_x           = 635;
@@ -165,57 +165,90 @@ void rc_station_interrupt(void) {
 
 ///////////////////////////////////////////////////////////////////
 // Local functions:
+#define DEADZONE_JOY 10
 static void update_keyboard_inputs(void) {
-    float analog_value_f;
-    int16_t volt0_adc;
-    float max_linear_velocity;
-    float axis_range_f;
+    // float analog_value_f;
+    // int16_t volt0_adc;
+    // float max_linear_velocity;
+    // float axis_range_f;
+    int16_t raw_offset;
+
+    raw_offset = analogRead(JOY_VRY) - Station.joy_neutral_pos_y;
+    if (abs(raw_offset) < DEADZONE_JOY) {
+        Station.cmd_yaw_int = 0;
+    } else {
+        if (raw_offset > 0) {
+            Station.cmd_yaw_int = (int8_t)map(raw_offset, DEADZONE_JOY, 1023 - Station.joy_neutral_pos_y, 0, 127);
+        } else {
+            Station.cmd_yaw_int = (int8_t)map(raw_offset, -Station.joy_neutral_pos_y, -DEADZONE_JOY, -128, 0);
+        }
+    }
+
+    raw_offset = analogRead(JOY_VRX) - Station.joy_neutral_pos_x;
+    if (abs(raw_offset) < DEADZONE_JOY) {
+        Station.cmd_x_int = 0;
+    } else {
+        if (raw_offset > 0) {
+            Station.cmd_x_int = (int8_t)map(raw_offset, DEADZONE_JOY, 1023 - Station.joy_neutral_pos_x, 0, 127);
+        } else {
+            Station.cmd_x_int = (int8_t)map(raw_offset, -Station.joy_neutral_pos_x, -DEADZONE_JOY, -128, 0);
+        }
+    }
+
+    raw_offset = analogRead(VOLT0_READ_PIN);
+    if (abs(raw_offset) < DEADZONE_JOY) {
+        Station.gear = 0;
+    } else {
+        Station.gear = (uint8_t)map(raw_offset, DEADZONE_JOY, 1023, 0, 255);
+    }
 
     // Compute rotation twist command:
-    analog_value_f = (float) (analogRead(JOY_VRY) - Station.joy_neutral_pos_y);
-    if(analog_value_f >= 0) {
-        axis_range_f = 1024.0 - (float) Station.joy_neutral_pos_y;
-    } else {
-        axis_range_f = (float) Station.joy_neutral_pos_y;
-    }
+    // analog_value_f = (float) (analogRead(JOY_VRY) - Station.joy_neutral_pos_y);
+    // if(analog_value_f >= 0) {
+    //     axis_range_f = 1024.0 - (float) Station.joy_neutral_pos_y;
+    // } else {
+    //     axis_range_f = (float) Station.joy_neutral_pos_y;
+    // }
     // if(!Station.status.sync_with_vehicle) {
     //     // Not receiving feedback command from vehicle, use local joystick command directly:
     //     Station.steer_percent = analog_value_f / axis_range_f;
     // }
-    Station.twist_yaw = analog_value_f / axis_range_f * MAX_ANGULAR_VEL;
+    // Station.twist_yaw = analog_value_f / axis_range_f * MAX_ANGULAR_VEL;
+    // Station.cmd_yaw = (int8_t) (analog_value_f / axis_range_f * 128.0);
 
     // Compute speed limit values:
-    volt0_adc = analogRead(VOLT0_READ_PIN);
-    if(volt0_adc >= 0 && volt0_adc < 200) {
-        Station.gear = 0;
-        max_linear_velocity = GEAR0_SPEED;
-    } else if(volt0_adc >= 200 && volt0_adc < 400) {
-        Station.gear = 1;
-        max_linear_velocity = GEAR1_SPEED;
-    } else if(volt0_adc >= 400 && volt0_adc < 600) {
-        Station.gear = 2;
-        max_linear_velocity = GEAR2_SPEED;
-    } else if(volt0_adc >= 600 && volt0_adc < 800) {
-        Station.gear = 3;
-        max_linear_velocity = GEAR3_SPEED;
-    } else if(volt0_adc >= 800) {
-        Station.gear = 4;
-        max_linear_velocity = GEAR4_SPEED;
-    }
+    // raw_offset = analogRead(VOLT0_READ_PIN);
+    // if(raw_offset >= 0 && raw_offset < 400) {
+    //     Station.gear = 1;
+    //     // max_linear_velocity = GEAR0_SPEED;
+    // } else if(raw_offset >= 400 && raw_offset < 800) {
+    //     Station.gear = 2;
+    //     // max_linear_velocity = GEAR1_SPEED;
+    // // } else if(raw_offset >= 400 && raw_offset < 600) {
+    //     // Station.gear = 3;
+    //     // max_linear_velocity = GEAR2_SPEED;
+    // // } else if(raw_offset >= 600 && raw_offset < 800) {
+    //     // Station.gear = 4;
+    //     // max_linear_velocity = GEAR3_SPEED;
+    // } else if(raw_offset >= 800) {
+    //     Station.gear = 3;
+    //     // max_linear_velocity = GEAR4_SPEED;
+    // }
     
     // Compute longitudinal twist command:
     // Longitudinal corresponds to joystick x-axis, positive value forward
-    analog_value_f = (float) (analogRead(JOY_VRX) - Station.joy_neutral_pos_x);
-    if(analog_value_f >= 0) {
-        axis_range_f = 1024.0 - (float) Station.joy_neutral_pos_x;
-    } else {
-        axis_range_f = (float) Station.joy_neutral_pos_x;
-    }
+    // analog_value_f = (float) (analogRead(JOY_VRX) - Station.joy_neutral_pos_x);
+    // if(analog_value_f >= 0) {
+    //     axis_range_f = 1024.0 - (float) Station.joy_neutral_pos_x;
+    // } else {
+    //     axis_range_f = (float) Station.joy_neutral_pos_x;
+    // }
     // if(!Station.status.sync_with_vehicle) {
     //     // Not receiving feedback command from vehicle, use local joystick command directly:
     //     Station.throttle_percent = analog_value_f / axis_range_f;
     // }
-    Station.twist_x = analog_value_f / axis_range_f * max_linear_velocity;
+    // Station.twist_x = analog_value_f / axis_range_f * max_linear_velocity;
+    // Station.cmd_x = (int8_t) (analog_value_f / axis_range_f * 128.0);
 
     // Detect push button press event:
     Station.status.func_key1_pressed = 0;
@@ -251,8 +284,8 @@ static void process_status_packet(const vehicle_status_t *frame) {
     }
     sequenceID++;
 
-    Station.twist_x_reply       = frame->cmd_x;
-    Station.twist_yaw_reply     = frame->cmd_yaw;
+    Station.cmd_x_reply       = frame->cmd_x_reply;
+    Station.cmd_yaw_reply     = frame->cmd_yaw_reply;
     Station.left_pwm            = frame->left_pwm;
     Station.right_pwm           = frame->right_pwm;
     Station.debug_code          = frame->debug_code;
@@ -288,16 +321,11 @@ static void process_ekf_frame(const ekf_status_t *frame) {
         sequenceID = frame->sequence_id;
     }
     sequenceID++;
-    // Station.ekf_x       = ((float) frame.ekf_x_int)      / XY_F2I_MULTI;
-    // Station.ekf_y       = ((float) frame.ekf_y_int)      / XY_F2I_MULTI;
-    // Station.ekf_yaw     = ((float) frame.ekf_yaw_int)    / YAW_F2I_MULTI;
-    // Station.ekf_vyaw    = ((float) frame.ekf_vyaw_int)   / ANG_VEL_F2I_MULTI;
-    // Station.ekf_v       = ((float) frame.ekf_v_int)      / LIN_VEL_F2I_MULTI;
-    Station.ekf_x       = frame->ekf_x;
-    Station.ekf_y       = frame->ekf_y;
-    Station.ekf_yaw     = frame->ekf_yaw;
-    Station.ekf_vyaw    = frame->ekf_vyaw;
-    Station.ekf_v       = frame->ekf_v;
+    // Station.ekf_x       = frame->ekf_x;
+    // Station.ekf_y       = frame->ekf_y;
+    // Station.ekf_yaw     = frame->ekf_yaw;
+    // Station.ekf_vyaw    = frame->ekf_vyaw;
+    // Station.ekf_v       = frame->ekf_v;
 }
 
 static void process_navi_frame(const navigation_status_t *frame) {
@@ -380,9 +408,11 @@ static void generate_cmd_packet(command_frame_t *frame) {
         // frame.twist_x_int            = (int16_t) (Station.twist_x * LIN_VEL_F2I_MULTI);
         // frame.twist_yaw_int          = (int16_t) (Station.twist_yaw * ANG_VEL_F2I_MULTI);
     // }
-    frame->twist_x            = Station.twist_x;
-    frame->twist_yaw          = Station.twist_yaw;
-    frame->gear = Station.gear;
+    // frame->twist_x            = Station.twist_x;
+    // frame->twist_yaw          = Station.twist_yaw;
+    frame->cmd_x_int                = Station.cmd_x_int;
+    frame->cmd_yaw_int              = Station.cmd_yaw_int;
+    frame->gear                     = Station.gear;
     frame->checksum = compute_checksum((char *) frame, sizeof(command_frame_t));
 }
 
@@ -616,23 +646,23 @@ static void render(void) {
             IO.lcd_refresh_callback();
             break;
         case SM_DEBUG3:
-            offset = 0;
-            float2str(Station.ekf_x, floatbuf, LCD_BUF_SIZE, 2);
-            offset += snprintf(
-                IO.lcd_buf+offset,
-                LCD_BUF_SIZE-offset,
-                "X:%s  ",
-                floatbuf
-            );
-            float2str(Station.ekf_y, floatbuf, LCD_BUF_SIZE, 2);
-            offset += snprintf(
-                IO.lcd_buf+offset,
-                LCD_BUF_SIZE-offset,
-                "Y:%s",
-                floatbuf
-            );
-            IO.flags = LCD_REFRESH_LINE1;
-            IO.lcd_refresh_callback();
+            // offset = 0;
+            // float2str(Station.ekf_x, floatbuf, LCD_BUF_SIZE, 2);
+            // offset += snprintf(
+            //     IO.lcd_buf+offset,
+            //     LCD_BUF_SIZE-offset,
+            //     "X:%s  ",
+            //     floatbuf
+            // );
+            // float2str(Station.ekf_y, floatbuf, LCD_BUF_SIZE, 2);
+            // offset += snprintf(
+            //     IO.lcd_buf+offset,
+            //     LCD_BUF_SIZE-offset,
+            //     "Y:%s",
+            //     floatbuf
+            // );
+            // IO.flags = LCD_REFRESH_LINE1;
+            // IO.lcd_refresh_callback();
             break;
         default:
             break;
@@ -676,23 +706,23 @@ static void render(void) {
             IO.lcd_refresh_callback();
             break;
         case SM_DEBUG3:
-            offset = 0;
-            float2str(Station.ekf_yaw, floatbuf, LCD_BUF_SIZE, 1);
-            offset += snprintf(
-                IO.lcd_buf+offset,
-                LCD_BUF_SIZE-offset,
-                "Z:%s     ",
-                floatbuf
-            );
-            float2str(Station.ekf_vyaw, floatbuf, LCD_BUF_SIZE, 1);
-            offset += snprintf(
-                IO.lcd_buf+offset,
-                LCD_BUF_SIZE-offset,
-                "VZ:%s",
-                floatbuf
-            );
-            IO.flags = LCD_REFRESH_LINE2;
-            IO.lcd_refresh_callback();
+            // offset = 0;
+            // float2str(Station.ekf_yaw, floatbuf, LCD_BUF_SIZE, 1);
+            // offset += snprintf(
+            //     IO.lcd_buf+offset,
+            //     LCD_BUF_SIZE-offset,
+            //     "Z:%s     ",
+            //     floatbuf
+            // );
+            // float2str(Station.ekf_vyaw, floatbuf, LCD_BUF_SIZE, 1);
+            // offset += snprintf(
+            //     IO.lcd_buf+offset,
+            //     LCD_BUF_SIZE-offset,
+            //     "VZ:%s",
+            //     floatbuf
+            // );
+            // IO.flags = LCD_REFRESH_LINE2;
+            // IO.lcd_refresh_callback();
             break;
         default:
             break;
@@ -750,15 +780,15 @@ static void render(void) {
             IO.lcd_refresh_callback();
             break;
         case SM_DEBUG3:
-            float2str(Station.ekf_v, floatbuf, LCD_BUF_SIZE, 2);
-            snprintf(
-                IO.lcd_buf,
-                LCD_BUF_SIZE,
-                "V:%s",
-                floatbuf
-            );
-            IO.flags = LCD_REFRESH_LINE3;
-            IO.lcd_refresh_callback();
+            // float2str(Station.ekf_v, floatbuf, LCD_BUF_SIZE, 2);
+            // snprintf(
+            //     IO.lcd_buf,
+            //     LCD_BUF_SIZE,
+            //     "V:%s",
+            //     floatbuf
+            // );
+            // IO.flags = LCD_REFRESH_LINE3;
+            // IO.lcd_refresh_callback();
             break;
         default:
             break;
@@ -816,8 +846,8 @@ static void render(void) {
     // ====================
     // BATT:11.6    GPS:OK
     // MODE:MANUAL  NAV:OFF
-    // L:255 R:105  s2v:OK
-    // DT:20        DEBUG:2
+    // L:-255 R:105  s2v:OK
+    //              DEBUG:2
     // ====================
 
     // Debug mode2 (SM_DEBUG2):
@@ -844,10 +874,10 @@ static void generate_steer_effect(char *out, int sz) {
     // 0    5 7      14   19
     char arrows[6];
     int i;
-    int num_arrows = (int) roundf(fabs(Station.twist_yaw) / MAX_ANGULAR_VEL * 6.0);
+    int num_arrows = (int) roundf(fabs(Station.cmd_yaw_reply) / MAX_ANGULAR_VEL * 6.0);
     num_arrows = max(0, min(5, num_arrows));
 
-    if(Station.twist_yaw >= 0) {
+    if(Station.cmd_yaw_reply >= 0) {
         // Right rotation
         for(i = 0; i < num_arrows; i++) {
             arrows[i] = '>';
@@ -885,7 +915,7 @@ static void generate_throttle_effect(char *out, int sz) {
     int i;
     char arrows[6];
 
-    num_arrows = (int) roundf(fabs(Station.twist_x) / MAX_LINEAR_VEL * 6.0);
+    num_arrows = (int) roundf(fabs(Station.cmd_x_reply) / MAX_LINEAR_VEL * 6.0);
     num_arrows = max(0, min(5, num_arrows));
 
     // Clear output:
@@ -896,7 +926,7 @@ static void generate_throttle_effect(char *out, int sz) {
     }
     arrows[5] = '\0';
 
-    if(Station.twist_x >= 0) {
+    if(Station.cmd_x_reply >= 0) {
         // Forward acceleration
         snprintf(out, sz, "ACCEL%s    GEAR:%d", arrows, Station.gear);
     } else {

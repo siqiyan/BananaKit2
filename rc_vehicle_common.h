@@ -16,18 +16,18 @@
 #define MAX_NAVIGATION_RANGE        200.0   // meter
 #define SPEED_REDUCTION_RANGE       3.0     // meter, full speed if goal dist exceed this range
 #define GOAL_REACH_RANGE            0.5     // meter, tolerance value to determine if goal is reached range
-#define MAX_LINEAR_VEL              0.08     // meter/sec for auto mode
-#define MIN_LINEAR_VEL              0.02     // meter/sec, reduction speed, for auto mode
+#define MAX_LINEAR_VEL              0.08     // meter/sec
+// #define MIN_LINEAR_VEL              0.02     // meter/sec, reduction speed, for auto mode
 #define MAX_ANGULAR_VEL             0.785    // rad/s, auto mode and manual mode
 #define RAMP_LINEAR_ACCEL           5.0     // meter/sec^2
 #define MAX_WAYPOINT_SZ             10
 
 // Manual speed at different gear level:
-#define GEAR0_SPEED                 0.1
-#define GEAR1_SPEED                 0.3
-#define GEAR2_SPEED                 0.5
-#define GEAR3_SPEED                 0.9
-#define GEAR4_SPEED                 1.5
+// #define GEAR1_SPEED                 0.1
+// #define GEAR2_SPEED                 0.6
+// #define GEAR3_SPEED                 1.5
+// #define GEAR4_SPEED                 0.9
+// #define GEAR5_SPEED                 1.5
 
 // Convert between float and integer for data communication
 // After conversion to integer the number after float point will be discard during transmiting
@@ -64,8 +64,8 @@ typedef struct __attribute__((__packed__)) {
         uint8_t right_dir:      1;      
     } status;
     int16_t sequence_id;
-    float cmd_x;
-    float cmd_yaw;
+    float cmd_x_reply;
+    float cmd_yaw_reply;
     uint8_t left_pwm;
     uint8_t right_pwm;
     uint8_t debug_code;
@@ -131,11 +131,11 @@ typedef struct __attribute__((__packed__)) {
     } status;
 
     int16_t sequence_id;
-    // int16_t twist_x_int;
-    // int16_t twist_yaw_int;
-    float twist_x;
-    float twist_yaw;
-    int8_t gear;
+    int8_t cmd_x_int;
+    int8_t cmd_yaw_int;
+    // float twist_x;
+    // float twist_yaw;
+    uint8_t gear;
     uint8_t checksum;
 } command_frame_t;
 

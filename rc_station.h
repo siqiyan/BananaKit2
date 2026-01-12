@@ -52,8 +52,12 @@ typedef struct {
 // RC station variables:
 typedef struct __rc_station__ {
     rc_station_status_t status;
-    float               twist_x, twist_yaw;
-    float               twist_x_reply, twist_yaw_reply;
+    // float               twist_x, twist_yaw;
+    int8_t             cmd_x_int;
+    int8_t             cmd_yaw_int;
+    float               cmd_x_reply, cmd_yaw_reply;
+    // int16_t             cmd_x_reply;
+    // int16_t             cmd_yaw_reply;
     int16_t             battery_adc_value;
     geo_coordinate_t    vehicle_coordinate;
     int16_t             joy_neutral_pos_x;
@@ -63,11 +67,11 @@ typedef struct __rc_station__ {
     // float               steer_percent;
     // int8_t              throttle_percent_int;
     // int8_t              steer_percent_int;
-    float               ekf_x;
-    float               ekf_y;
-    float               ekf_yaw;
-    float               ekf_v;
-    float               ekf_vyaw;
+    // float               ekf_x;
+    // float               ekf_y;
+    // float               ekf_yaw;
+    // float               ekf_v;
+    // float               ekf_vyaw;
     uint8_t             left_pwm;
     uint8_t             right_pwm;
     int32_t             delta_ms;
