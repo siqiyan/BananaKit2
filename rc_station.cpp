@@ -34,8 +34,9 @@ static RF24 RF_radio(NRF24_CE_PIN, NRF24_CSN_PIN);
 static rc_station_t Station;
 static command_frame_t AckPacket;
 static int32_t currTimestamp;
-static int32_t prevRenderTimestamp;
+static int32_t prevTimestamp;
 static int16_t sequenceID;
+static uint8_t iterCounter;
 static int16_t frameCounter;
 static uint8_t newPacketEvent;
 static int32_t LostPacketCounter;
@@ -73,10 +74,11 @@ void rc_station_init(void) {
 
     // Init global variables:
     currTimestamp           = 0;
-    prevRenderTimestamp     = 0;
+    prevTimestamp           = 0;
     sequenceID              = 0;
     LostPacketCounter       = 0;
     frameCounter            = 0;
+    iterCounter             = 0;
 
     // Init rc station variables:
     memset(&Station, 0, sizeof(rc_station_t));
@@ -108,21 +110,68 @@ node_status_t rc_station_update(void) {
     node_status_t next_state = NODE_RUNNING;
 
     currTimestamp = millis();
-    if(prevRenderTimestamp == 0) {
+    if(prevTimestamp == 0) {
         // First iteration, skip:
-        prevRenderTimestamp = currTimestamp;
+        prevTimestamp = currTimestamp;
         return next_state;
     }
 
-    update_state_machine();
     update_communication_irq();
-    update_keyboard_inputs();
 
-    if(currTimestamp - prevRenderTimestamp >= 500) {
-        render();
+    if(currTimestamp - prevTimestamp >= MAIN_LOOP_PERIOD) {
 
-        prevRenderTimestamp = currTimestamp;
+        // Use a scheduling table to balance CPU load
+        // loop rate 10Hz, each iter%10 run at 1Hz, can control task range 1-10Hz with step size 1Hz
+        switch(iterCounter) {
+            case 0:
+                update_keyboard_inputs();
+                update_state_machine();
+                break;
+            case 1:
+                render();
+                break;
+            case 2:
+                update_keyboard_inputs();
+                update_state_machine();
+                break;
+            case 3:
+                break;
+            case 4:
+                update_keyboard_inputs();
+                update_state_machine();
+                break;
+            case 5:
+                break;
+            case 6:
+                update_keyboard_inputs();
+                update_state_machine();
+                break;
+            case 7:
+                render();
+                break;
+            case 8:
+                update_keyboard_inputs();
+                update_state_machine();
+                break;
+            case 9:
+                break;
+            default:
+                break;
+        }
+
+        prevTimestamp = currTimestamp;
+        iterCounter = (iterCounter + 1) % 10;
     }
+
+    // update_state_machine();
+    // update_communication_irq();
+    // update_keyboard_inputs();
+
+    // if(currTimestamp - prevRenderTimestamp >= 500) {
+    //     render();
+
+    //     prevRenderTimestamp = currTimestamp;
+    // }
 
     switch(IO.keypress) {
         case PIC_POWER:
@@ -831,7 +880,7 @@ static void generate_steer_effect(char *out, int sz) {
     // num_arrows = max(0, min(5, num_arrows));
     int num_arrows = map(abs(Station.cmd_yaw_int), 0, 127, 0, 5);
 
-    if(Station.cmd_yaw_int >= 0) {
+    if(Station.cmd_yaw_int < 0) {
         // Right rotation
         for(i = 0; i < num_arrows; i++) {
             arrows[i] = '>';
