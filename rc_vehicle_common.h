@@ -77,7 +77,8 @@ typedef struct __attribute__((__packed__)) {
         uint8_t gps_initialized:        1;
         uint8_t lat_north_positive:     1;
         uint8_t lon_east_positive:      1;
-        uint8_t reserved:               4; // fill the byte
+        uint8_t compass_valid:          1;
+        uint8_t reserved:               3; // fill the byte
     } status;
 
     int16_t sequence_id;
@@ -85,6 +86,9 @@ typedef struct __attribute__((__packed__)) {
     int16_t lon_degree;
     float lat_minute;
     float lon_minute;
+    float compass_yaw;
+    float local_x;
+    float local_y;
     uint8_t checksum;
 } gps_status_t;
 
@@ -118,12 +122,12 @@ typedef struct __attribute__((__packed__)) {
     uint8_t header;
 
     struct __attribute__((__packed__)) {
-        uint8_t cmd_estop:              1;
+        // uint8_t cmd_estop:              1;
         uint8_t cmd_auto_mode:          1;
         uint8_t cmd_navigate_start:     1;
         uint8_t cmd_navigate_cancel:    1;
         uint8_t cmd_set_origin:         1;
-        uint8_t reserved:               3;
+        uint8_t reserved:               4;
     } status;
 
     int16_t sequence_id;

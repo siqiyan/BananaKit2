@@ -19,5 +19,6 @@ int field_extract(
     char *field,
     int field_sz
 );
+void right_align_overlay(const char *input, char *dest, size_t dest_len);
 
 #endif

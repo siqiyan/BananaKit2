@@ -17,45 +17,63 @@
 
 typedef enum {
     SM_UNCONNECT,
-    SM_MANUAL,
-    SM_MANU_ESTOP_INIT,
-    SM_MANU_ESTOP,
+    SM_MANUAL1,
+    SM_MANUAL2,
+    SM_MANUAL3,
+    SM_MANUAL4,
     SM_NAVIGATE1,
     SM_NAVIGATE2,
-    SM_NAV_ESTOP_INIT,
-    SM_NAV_ESTOP,
-    SM_SETTING,
-    SM_DEBUG1,
-    SM_DEBUG2
+    SM_NAVIGATE3
 } station_state_machine_t;
 
-typedef struct {
-    uint8_t navigate_running:       1;
-    uint8_t gps_data_valid:         1;
-    uint8_t gps_initialized:        1;
-    uint8_t gps_origin_set:         1;
-    uint8_t is_connected:           1;
-    uint8_t cmd_auto_mode:          1;
-    uint8_t cmd_navigate_start:     1;
-    uint8_t cmd_navigate_cancel:    1;
-    uint8_t cmd_estop:              1;
-    uint8_t cmd_set_origin:         1;
-    uint8_t sync_with_vehicle:      1;
-    uint8_t func_key1_pressed:      1;
-    uint8_t func_key2_pressed:      1;
-    uint8_t func_key3_pressed:      1;
-    uint8_t recv_header_err:        1;
-} rc_station_status_t;
+// typedef struct {
+//     uint8_t navigate_running:       1;
+//     uint8_t gps_data_valid:         1;
+//     uint8_t gps_initialized:        1;
+//     uint8_t gps_origin_set:         1;
+//     uint8_t is_connected:           1;
+//     uint8_t cmd_auto_mode:          1;
+//     uint8_t auto_mode:              1;
+//     uint8_t cmd_navigate_start:     1;
+//     uint8_t cmd_navigate_cancel:    1;
+//     uint8_t cmd_set_origin:         1;
+//     uint8_t sync_with_vehicle:      1;
+//     uint8_t button_left_pressed:    1;
+//     uint8_t button_right_pressed:   1;
+//     uint8_t button_joy_pressed:     1;
+//     uint8_t recv_header_err:        1;
+// } rc_station_status_t;
 
 // RC station variables:
 typedef struct __rc_station__ {
-    rc_station_status_t status;
+    struct {
+        uint8_t navigate_running:       1;
+        uint8_t gps_data_valid:         1;
+        uint8_t gps_initialized:        1;
+        uint8_t gps_origin_set:         1;
+        uint8_t compass_valid:          1;
+        uint8_t is_connected:           1;
+        uint8_t cmd_auto_mode:          1;
+        uint8_t auto_mode:              1;
+        uint8_t cmd_navigate_start:     1;
+        uint8_t cmd_navigate_cancel:    1;
+        uint8_t cmd_set_origin:         1;
+        uint8_t sync_with_vehicle:      1;
+        uint8_t button_left_pressed:    1;
+        uint8_t button_right_pressed:   1;
+        uint8_t button_joy_pressed:     1;
+        uint8_t recv_header_err:        1;
+    } status;
+
     int8_t              cmd_x_int;
     int8_t              cmd_yaw_int;
     float               cmd_x_reply;
     float               cmd_yaw_reply;
     int16_t             battery_adc_value;
     geo_coordinate_t    vehicle_coordinate;
+    float               compass_yaw;
+    float               local_x;
+    float               local_y;
     int16_t             joy_neutral_pos_x;
     int16_t             joy_neutral_pos_y;
     uint8_t             gear;

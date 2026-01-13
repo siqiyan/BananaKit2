@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 #include <math.h>
 #include <Arduino.h>
 #include <util/atomic.h>
@@ -33,11 +34,9 @@ static RF24 RF_radio(NRF24_CE_PIN, NRF24_CSN_PIN);
 static rc_station_t Station;
 static command_frame_t AckPacket;
 static int32_t currTimestamp;
-static int32_t prevUpdateTimestamp, prevRenderTimestamp;
+static int32_t prevRenderTimestamp;
 static int16_t sequenceID;
 static int16_t frameCounter;
-static uint8_t iterCounter;
-static uint8_t warnIter;
 static uint8_t newPacketEvent;
 static int32_t LostPacketCounter;
 
@@ -46,7 +45,7 @@ static void incoming_packet_handle() {
 }
 
 void rc_station_init(void) {
-    // Serial.begin(UART_SPEED_BPS);
+    Serial.begin(9600);
 
     // NRF24 Initialize:
     RF_radio.begin();
@@ -74,16 +73,13 @@ void rc_station_init(void) {
 
     // Init global variables:
     currTimestamp           = 0;
-    prevUpdateTimestamp     = 0;
     prevRenderTimestamp     = 0;
     sequenceID              = 0;
     LostPacketCounter       = 0;
     frameCounter            = 0;
-    iterCounter             = 0;
-    warnIter                = 9;
 
     // Init rc station variables:
-    memset(&Station.status, 0, sizeof(rc_station_status_t)); // clear all status bits
+    memset(&Station, 0, sizeof(rc_station_t));
     Station.status.is_connected         = 0;
     Station.joy_neutral_pos_x           = 635;
     Station.joy_neutral_pos_y           = 645;
@@ -91,7 +87,7 @@ void rc_station_init(void) {
     Station.sm_state                    = SM_UNCONNECT;
 
     // Init joystick:
-    // pinMode(JOY_SW, INPUT_PULLUP); // disabled, this pin conflict with nrf24 IRQ pin
+    pinMode(JOY_SW, INPUT_PULLUP);
     pinMode(JOY_PUSH_BUTTON_0, INPUT_PULLUP);
     pinMode(JOY_PUSH_BUTTON_1, INPUT_PULLUP);
 
@@ -112,9 +108,8 @@ node_status_t rc_station_update(void) {
     node_status_t next_state = NODE_RUNNING;
 
     currTimestamp = millis();
-    if(prevUpdateTimestamp == 0) {
+    if(prevRenderTimestamp == 0) {
         // First iteration, skip:
-        prevUpdateTimestamp = currTimestamp;
         prevRenderTimestamp = currTimestamp;
         return next_state;
     }
@@ -193,18 +188,25 @@ static void update_keyboard_inputs(void) {
     }
 
     // Detect push button press event:
-    Station.status.func_key1_pressed = 0;
-    Station.status.func_key2_pressed = 0;
+    Station.status.button_left_pressed = 0;
+    Station.status.button_right_pressed = 0;
+    Station.status.button_joy_pressed = 0;
     if(digitalRead(JOY_PUSH_BUTTON_0) == LOW) {
         delay(20);
         if(digitalRead(JOY_PUSH_BUTTON_0) == LOW) {
-            Station.status.func_key1_pressed = 1;
+            Station.status.button_left_pressed = 1;
         }
     }
     if(digitalRead(JOY_PUSH_BUTTON_1) == LOW) {
         delay(20);
         if(digitalRead(JOY_PUSH_BUTTON_1) == LOW) {
-            Station.status.func_key2_pressed = 1;
+            Station.status.button_right_pressed = 1;
+        }
+    }
+    if(digitalRead(JOY_SW) == LOW) {
+        delay(20);
+        if(digitalRead(JOY_SW) == LOW) {
+            Station.status.button_joy_pressed = 1;
         }
     }
 }
@@ -250,12 +252,16 @@ static void process_gps_frame(const gps_status_t *frame) {
 
     Station.status.gps_initialized                  = frame->status.gps_initialized;
     Station.status.gps_data_valid                   = frame->status.gps_data_valid;
+    Station.status.compass_valid                    = frame->status.compass_valid;
     Station.vehicle_coordinate.lat_north_positive   = frame->status.lat_north_positive;
     Station.vehicle_coordinate.lon_east_positive    = frame->status.lon_east_positive;
     Station.vehicle_coordinate.lat_degree           = frame->lat_degree;
     Station.vehicle_coordinate.lon_degree           = frame->lon_degree;
     Station.vehicle_coordinate.lat_minute           = frame->lat_minute;
     Station.vehicle_coordinate.lon_minute           = frame->lon_minute;
+    Station.compass_yaw                             = frame->compass_yaw;
+    Station.local_x                                 = frame->local_x;
+    Station.local_y                                 = frame->local_y;
     Station.status.is_connected = 1;
 }
 
@@ -326,7 +332,6 @@ static void generate_cmd_packet(command_frame_t *frame) {
     frame->sequence_id = frameCounter++;
     frame->status.cmd_navigate_start  = Station.status.cmd_navigate_start;
     frame->status.cmd_navigate_cancel = Station.status.cmd_navigate_cancel;
-    frame->status.cmd_estop           = Station.status.cmd_estop;
     frame->status.cmd_auto_mode       = Station.status.cmd_auto_mode;
     frame->status.cmd_set_origin      = Station.status.cmd_set_origin;
     if(!Station.status.cmd_auto_mode) {
@@ -338,174 +343,178 @@ static void generate_cmd_packet(command_frame_t *frame) {
 }
 
 static void update_state_machine(void) {
+    // Interaction logic:
+    // Manual mode (press left) -> manual info mode
+    // Manual mode (press right) -> navi mode
+    //
+    // Navi mode (press left) -> navi info mode
+    // Navi mode (press right) -> manual mode
+    // Navi mode (move joystick) -> pause
+    // Navi mode (press joy sw) -> restore
+    //
+    // Manual info mode (press left) -> loop
+    // Manual info mode (press right) -> navi mode
+    //
+    // Navi info mode (press left) -> loop
+    // Navi info mode (press right) -> manual mode
+    // Navi info mode (press joystick) -> pause
+    // Navi info mode (press joy sw) -> restore
+
     switch(Station.sm_state) {
         case SM_UNCONNECT:
             if(Station.status.is_connected) {
-                Station.sm_state = SM_MANUAL;
+                Station.sm_state = SM_MANUAL1;
             }
             break;
 
-        case SM_MANUAL:
-            if(Station.status.func_key2_pressed) {
-                // Switch to MANU_ESTOP:
-                Station.status.cmd_estop = 1;
-                Station.sm_state = SM_MANU_ESTOP_INIT;
-            } else if(IO.keypress == PIC_PLAY) {
+        case SM_MANUAL1:
+        case SM_MANUAL2:
+        case SM_MANUAL3:
+        case SM_MANUAL4:
+            if(Station.status.button_right_pressed) {
                 // Request to start navigation:
                 Station.status.cmd_navigate_start = 1;
-            } else if(IO.keypress == PIC_CHAOS) {
-                // Enter debug mode:
-                Station.sm_state = SM_DEBUG1;
+            } else if(Station.status.button_left_pressed) {
+                // Loop info screen:
+                if(Station.sm_state == SM_MANUAL1) {
+                    Station.sm_state = SM_MANUAL2;
+                } else if(Station.sm_state == SM_MANUAL2) {
+                    Station.sm_state = SM_MANUAL3;
+                } else if(Station.sm_state == SM_MANUAL3) {
+                    Station.sm_state = SM_MANUAL4;
+                } else if(Station.sm_state == SM_MANUAL4) {
+                    Station.sm_state = SM_MANUAL1;
+                }
+            } else if(Station.status.button_joy_pressed) {
+                // Request to set GPS origin:
+                Station.status.cmd_set_origin = 1;
             }
             if(Station.status.navigate_running) {
-                // Navigation is running:
+                // Navigation is running, change to navigation state:
                 Station.status.cmd_navigate_start = 0;
                 Station.sm_state = SM_NAVIGATE1;
             }
-            break;
-
-        case SM_MANU_ESTOP_INIT:
-            if(!Station.status.func_key2_pressed) {
-                // Wait for the estop button release:
-                Station.sm_state = SM_MANU_ESTOP;
-            }
-            break;
-
-        case SM_MANU_ESTOP:
-            if(Station.status.func_key2_pressed) {
-                // estop pressed the second time, cancel estop:
-                Station.status.cmd_estop = 0;
-                Station.sm_state = SM_MANUAL;
+            if(Station.status.gps_origin_set) {
+                Station.status.cmd_set_origin = 0;
             }
             break;
 
         case SM_NAVIGATE1:
-            if(Station.status.func_key2_pressed) {
-                // E-stop:
-                Station.sm_state = SM_NAV_ESTOP_INIT;
-            } else if(Station.status.func_key1_pressed) {
-                // Auto/manual mode switch:
-                if(Station.status.cmd_auto_mode) {
-                    Station.status.cmd_auto_mode = 0;
-                } else {
-                    Station.status.cmd_auto_mode = 1;
-                }
-            } else if(IO.keypress == PIC_PLAY) {
-                // Request to stop navigation:
-                Station.status.cmd_navigate_cancel = 1;
-            } else if(Station.status.func_key1_pressed) {
-                // Change to next screen:
-                Station.sm_state = SM_NAVIGATE2;
-            } else if(IO.keypress == PIC_CHAOS) {
-                // Enter debug mode:
-                Station.sm_state = SM_DEBUG1;
-            }
-            if(!Station.status.navigate_running) {
-                Station.status.cmd_navigate_cancel = 0;
-                Station.sm_state = SM_MANUAL;
-            }
-            break;
-
         case SM_NAVIGATE2:
-            if(Station.status.func_key2_pressed) {
-                // E-stop:
-                Station.sm_state = SM_NAV_ESTOP;
-            } else if(Station.status.func_key1_pressed) {
-                // Auto/manual mode switch:
-                if(Station.status.cmd_auto_mode) {
-                    Station.status.cmd_auto_mode = 0;
-                } else {
-                    Station.status.cmd_auto_mode = 1;
-                }
-            } else if(IO.keypress == PIC_PLAY) {
+        case SM_NAVIGATE3:
+            if(Station.status.button_right_pressed) {
                 // Request to stop navigation:
                 Station.status.cmd_navigate_cancel = 1;
-            } else if(Station.status.func_key1_pressed) {
-                // Change to previous screen:
-                Station.sm_state = SM_NAVIGATE1;
+            } else if(Station.status.button_left_pressed) {
+                // Loop info screen:
+                if(Station.sm_state == SM_NAVIGATE1) {
+                    Station.sm_state = SM_NAVIGATE2;
+                } else if(Station.sm_state == SM_NAVIGATE2) {
+                    Station.sm_state = SM_NAVIGATE3;
+                } else if(Station.sm_state == SM_NAVIGATE3) {
+                    Station.sm_state = SM_NAVIGATE1;
+                }
+            } else if(Station.cmd_x_int != 0 || Station.cmd_yaw_int != 0) {
+                // Joystick moved, request to switch manual mode (but don't stop navigation):
+                Station.status.cmd_auto_mode = 0;
             }
             if(!Station.status.navigate_running) {
+                // Navigation stopped, change to manual state:
                 Station.status.cmd_navigate_cancel = 0;
-                Station.sm_state = SM_MANUAL;
+                Station.sm_state = SM_MANUAL1;
             }
             break;
-
-        case SM_NAV_ESTOP_INIT:
-            if(!Station.status.func_key2_pressed) {
-                Station.sm_state = SM_NAV_ESTOP;
-            }
-            break;
-
-        case SM_NAV_ESTOP:
-            if(Station.status.func_key2_pressed) {
-                Station.sm_state = SM_NAVIGATE1;
-            }
-            break;
-
-        case SM_DEBUG1:
-            if(IO.keypress == PIC_PLUS) {
-                Station.sm_state = SM_DEBUG2;
-            } else if(IO.keypress == PIC_MINUS) {
-                Station.sm_state = SM_DEBUG2;
-            } else if(IO.keypress == PIC_CHAOS) {
-                if(Station.status.navigate_running) {
-                    Station.sm_state = SM_NAVIGATE1;
-                } else {
-                    Station.sm_state = SM_MANUAL;
-                }
-            }
-            break;
-
-        case SM_DEBUG2:
-            if(IO.keypress == PIC_PLUS) {
-                Station.sm_state = SM_DEBUG1;
-            } else if(IO.keypress == PIC_MINUS) {
-                Station.sm_state = SM_DEBUG1;
-            } else if(IO.keypress == PIC_CHAOS) {
-                if(Station.status.navigate_running) {
-                    Station.sm_state = SM_NAVIGATE1;
-                } else {
-                    Station.sm_state = SM_MANUAL;
-                }
-            }
-            break;
-
     }
 }
 
+#define ALIGN_BUF_SIZE 21
 static void render(void) {
     char floatbuf[LCD_BUF_SIZE];
-    int offset;
+    char align_buf[ALIGN_BUF_SIZE];
     IO.lcd_clear_callback();
 
     // Line 0:
     switch(Station.sm_state) {
         case SM_UNCONNECT:
-        case SM_MANUAL:
-        case SM_MANU_ESTOP:
+        case SM_MANUAL1:
         case SM_NAVIGATE1:
-        case SM_NAVIGATE2:
-        case SM_NAV_ESTOP:
-        case SM_DEBUG1:
             float2str(GET_ADC_VOLT(Station.battery_adc_value), floatbuf, LCD_BUF_SIZE, 1);
+            // memset(IO.lcd_buf, ' ', LCD_BUF_SIZE);
             snprintf(
                 IO.lcd_buf,
                 LCD_BUF_SIZE,
-                "BATT:%s     GPS:%s",
-                Station.status.is_connected ? floatbuf : "NA",
-                Station.status.gps_data_valid ? "OK" : "OFF"
+                "BATT:%s",
+                Station.status.is_connected ? floatbuf : "NA"
             );
+            // IO.lcd_buf[strlen(IO.lcd_buf)] = ' ';
+            snprintf(
+                align_buf,
+                ALIGN_BUF_SIZE,
+                "GPS:%s",
+                Station.status.gps_initialized ? (
+                    Station.status.gps_origin_set ? "ORI" : "OK"
+                ) : "NA"
+            );
+
+            right_align_overlay(align_buf, IO.lcd_buf, LCD_BUF_SIZE);
+
             IO.flags = LCD_REFRESH_LINE0;
             IO.lcd_refresh_callback();
             break;
-        case SM_DEBUG2:
+        case SM_MANUAL2:
             snprintf(
                 IO.lcd_buf,
                 LCD_BUF_SIZE,
-                "GPS INIT:%d  VALID:%d",
-                Station.status.gps_initialized,
+                "CMD X:%d",
+                Station.cmd_x_int
+            );
+            snprintf(
+                align_buf,
+                ALIGN_BUF_SIZE,
+                "YAW:%d",
+                Station.cmd_yaw_int
+            );
+            right_align_overlay(align_buf, IO.lcd_buf, LCD_BUF_SIZE);
+            IO.flags = LCD_REFRESH_LINE0;
+            IO.lcd_refresh_callback();
+            break;
+        case SM_MANUAL3:
+        case SM_MANUAL4:
+        case SM_NAVIGATE3:
+            snprintf(
+                IO.lcd_buf,
+                LCD_BUF_SIZE,
+                "GPS:%s",
+                Station.status.gps_initialized ? (
+                    Station.status.gps_origin_set ? "ORI" : "OK"
+                ) : "NA"
+            );
+            snprintf(
+                align_buf,
+                ALIGN_BUF_SIZE,
+                "VALID:%d",
                 Station.status.gps_data_valid
             );
+            right_align_overlay(align_buf, IO.lcd_buf, LCD_BUF_SIZE);
+            IO.flags = LCD_REFRESH_LINE0;
+            IO.lcd_refresh_callback();
+            break;
+        case SM_NAVIGATE2:
+            snprintf(
+                IO.lcd_buf,
+                LCD_BUF_SIZE,
+                "WPT:%d/%d",
+                Station.waypoint_index+1,
+                Station.waypoint_list_sz
+            );
+            float2str(Station.dist2goal, floatbuf, LCD_BUF_SIZE, 1);
+            snprintf(
+                align_buf,
+                ALIGN_BUF_SIZE,
+                "GOAL:%s",
+                floatbuf
+            );
+            right_align_overlay(align_buf, IO.lcd_buf, LCD_BUF_SIZE);
             IO.flags = LCD_REFRESH_LINE0;
             IO.lcd_refresh_callback();
             break;
@@ -516,30 +525,61 @@ static void render(void) {
     // Line 1:
     switch(Station.sm_state) {
         case SM_UNCONNECT:
-        case SM_MANUAL:
-        case SM_MANU_ESTOP:
+        case SM_MANUAL1:
         case SM_NAVIGATE1:
-        case SM_NAVIGATE2:
-        case SM_NAV_ESTOP:
-        case SM_DEBUG1:
             snprintf(
                 IO.lcd_buf,
                 LCD_BUF_SIZE,
-                "MODE:%s    NAV:%s",
-                Station.status.cmd_auto_mode ? "AUTO" : "MANU",
+                "MODE:%s",
+                Station.status.cmd_auto_mode ? "AUTO" : "MANU"
+            );
+            snprintf(
+                align_buf,
+                ALIGN_BUF_SIZE,
+                "NAV:%s",
                 Station.status.navigate_running ? "ON " : "OFF"
             );
+            right_align_overlay(align_buf, IO.lcd_buf, LCD_BUF_SIZE);
             IO.flags = LCD_REFRESH_LINE1;
             IO.lcd_refresh_callback();
             break;
-        case SM_DEBUG2:
+        case SM_MANUAL2:
+            float2str(Station.cmd_x_reply, floatbuf, LCD_BUF_SIZE, 1);
             snprintf(
                 IO.lcd_buf,
                 LCD_BUF_SIZE,
-                "ORIGIN:%d  SEQ:%d",
-                Station.status.gps_origin_set,
-                sequenceID
+                "RPY X:%s",
+                floatbuf
             );
+            float2str(Station.cmd_yaw_reply, floatbuf, LCD_BUF_SIZE, 1);
+            snprintf(
+                align_buf,
+                ALIGN_BUF_SIZE,
+                "YAW:%s",
+                floatbuf
+            );
+            right_align_overlay(align_buf, IO.lcd_buf, LCD_BUF_SIZE);
+            IO.flags = LCD_REFRESH_LINE1;
+            IO.lcd_refresh_callback();
+            break;
+        case SM_MANUAL3:
+        case SM_MANUAL4:
+        case SM_NAVIGATE2:
+        case SM_NAVIGATE3:
+            snprintf(
+                IO.lcd_buf,
+                LCD_BUF_SIZE,
+                "CPS:%s",
+                Station.status.compass_valid ? "OK" : "NA"
+            );
+            float2str(Station.compass_yaw, floatbuf, LCD_BUF_SIZE, 1);
+            snprintf(
+                align_buf,
+                ALIGN_BUF_SIZE,
+                "YAW:%s",
+                floatbuf
+            );
+            right_align_overlay(align_buf, IO.lcd_buf, LCD_BUF_SIZE);
             IO.flags = LCD_REFRESH_LINE1;
             IO.lcd_refresh_callback();
             break;
@@ -550,36 +590,75 @@ static void render(void) {
     // Line 2:
     switch(Station.sm_state) {
         case SM_UNCONNECT:
-        case SM_MANUAL:
-        case SM_MANU_ESTOP:
-        case SM_NAVIGATE1:
-        case SM_NAVIGATE2:
-        case SM_NAV_ESTOP:
+        case SM_MANUAL1:
             generate_throttle_effect(IO.lcd_buf, LCD_BUF_SIZE);
             IO.flags = LCD_REFRESH_LINE2;
             IO.lcd_refresh_callback();
             break;
-        case SM_DEBUG1:
+        case SM_MANUAL2:
             snprintf(
                 IO.lcd_buf,
                 LCD_BUF_SIZE,
-                "L:%d       CONN:%d",
-                Station.left_pwm_signed,
-                Station.status.is_connected
+                "L:%d",
+                Station.left_pwm_signed
             );
+            snprintf(
+                align_buf,
+                LCD_BUF_SIZE,
+                "SEQ:%d",
+                sequenceID
+            );
+            right_align_overlay(align_buf, IO.lcd_buf, LCD_BUF_SIZE);
             IO.flags = LCD_REFRESH_LINE2;
             IO.lcd_refresh_callback();
             break;
-        case SM_DEBUG2:
+        case SM_MANUAL3:
+        case SM_NAVIGATE3:
             float2str(Station.vehicle_coordinate.lat_minute, floatbuf, LCD_BUF_SIZE, 5);
             snprintf(
                 IO.lcd_buf,
                 LCD_BUF_SIZE,
-                "LAT:%dD%sM  %c",
+                "LAT:%dD%sM",
                 Station.vehicle_coordinate.lat_degree,
-                floatbuf,
+                floatbuf
+            );
+            snprintf(
+                align_buf,
+                ALIGN_BUF_SIZE,
+                "%c",
                 Station.vehicle_coordinate.lat_north_positive ? 'N' : 'S'
             );
+            right_align_overlay(align_buf, IO.lcd_buf, LCD_BUF_SIZE);
+            IO.flags = LCD_REFRESH_LINE2;
+            IO.lcd_refresh_callback();
+            break;
+        case SM_MANUAL4:
+        case SM_NAVIGATE2:
+            float2str(Station.local_x, floatbuf, LCD_BUF_SIZE, 1);
+            snprintf(
+                IO.lcd_buf,
+                LCD_BUF_SIZE,
+                "X:%s",
+                floatbuf
+            );
+            IO.flags = LCD_REFRESH_LINE2;
+            IO.lcd_refresh_callback();
+            break;
+        case SM_NAVIGATE1:
+            float2str(Station.dist2goal, floatbuf, LCD_BUF_SIZE, 1);
+            snprintf(
+                IO.lcd_buf,
+                LCD_BUF_SIZE,
+                "GOAL:%s",
+                floatbuf
+            );
+            snprintf(
+                align_buf,
+                ALIGN_BUF_SIZE,
+                "GEAR:%d",
+                Station.gear
+            );
+            right_align_overlay(align_buf, IO.lcd_buf, LCD_BUF_SIZE);
             IO.flags = LCD_REFRESH_LINE2;
             IO.lcd_refresh_callback();
             break;
@@ -598,43 +677,76 @@ static void render(void) {
             IO.flags = LCD_REFRESH_LINE3;
             IO.lcd_refresh_callback();
             break;
-        case SM_MANU_ESTOP:
-        case SM_NAV_ESTOP:
-            snprintf(
-                IO.lcd_buf,
-                LCD_BUF_SIZE,
-                "   *** E-STOP ***"
-            );
-            IO.flags = LCD_REFRESH_LINE3;
-            IO.lcd_refresh_callback();
-            break;
-        case SM_MANUAL:
-        case SM_NAVIGATE1:
+        case SM_MANUAL1:
             generate_steer_effect(IO.lcd_buf, LCD_BUF_SIZE);
             IO.flags = LCD_REFRESH_LINE3;
             IO.lcd_refresh_callback();
             break;
-        case SM_DEBUG1:
+        case SM_MANUAL2:
             snprintf(
                 IO.lcd_buf,
                 LCD_BUF_SIZE,
-                "R:%d     DEBUG:%d",
-                Station.right_pwm_signed,
+                "R:%d",
+                Station.right_pwm_signed
+            );
+            snprintf(
+                align_buf,
+                ALIGN_BUF_SIZE,
+                "DEBUG:%d",
                 Station.debug_code
             );
+            right_align_overlay(align_buf, IO.lcd_buf, LCD_BUF_SIZE);
             IO.flags = LCD_REFRESH_LINE3;
             IO.lcd_refresh_callback();
             break;
-        case SM_DEBUG2:
+        case SM_MANUAL3:
+        case SM_NAVIGATE3:
             float2str(Station.vehicle_coordinate.lon_minute, floatbuf, LCD_BUF_SIZE, 5);
             snprintf(
                 IO.lcd_buf,
                 LCD_BUF_SIZE,
-                "LON:%dD%sM  %c",
+                "LON:%dD%sM",
                 Station.vehicle_coordinate.lon_degree,
-                floatbuf,
+                floatbuf
+            );
+            snprintf(
+                align_buf,
+                ALIGN_BUF_SIZE,
+                "%c",
                 Station.vehicle_coordinate.lon_east_positive ? 'E' : 'W'
             );
+            right_align_overlay(align_buf, IO.lcd_buf, LCD_BUF_SIZE);
+            IO.flags = LCD_REFRESH_LINE3;
+            IO.lcd_refresh_callback();
+            break;
+        case SM_MANUAL4:
+        case SM_NAVIGATE2:
+            float2str(Station.local_y, floatbuf, LCD_BUF_SIZE, 1);
+            snprintf(
+                IO.lcd_buf,
+                LCD_BUF_SIZE,
+                "Y:%s",
+                floatbuf
+            );
+            IO.flags = LCD_REFRESH_LINE3;
+            IO.lcd_refresh_callback();
+            break;
+        case SM_NAVIGATE1:
+            float2str(Station.cmd_yaw_reply, floatbuf, LCD_BUF_SIZE, 1);
+            snprintf(
+                IO.lcd_buf,
+                LCD_BUF_SIZE,
+                "RPY X:%s",
+                floatbuf
+            );
+            float2str(Station.compass_yaw, floatbuf, LCD_BUF_SIZE, 1);
+            snprintf(
+                align_buf,
+                ALIGN_BUF_SIZE,
+                "YAW:%s",
+                floatbuf
+            );
+            right_align_overlay(align_buf, IO.lcd_buf, LCD_BUF_SIZE);
             IO.flags = LCD_REFRESH_LINE3;
             IO.lcd_refresh_callback();
             break;
@@ -642,68 +754,68 @@ static void render(void) {
             break;
     }
 
-    // On power-on, not connected to vehicle (SM_UNCONNECT):
+    // SM_UNCONNECT:
     // ====================
-    // BATT:NA      GPS:NA
+    // BATT:NA       GPS:NA
     // MODE:MANUAL  NAV:OFF
     // ACCEL+++++  GEAR:100
     //   *NOT CONNECTED*
     // ====================
 
-    // On power-on, receive signal, press accelerator (reverse) and steer slightly right (SM_MANUAL):
+    // SM_MANUAL1:
     // ====================
-    // BATT:11.6    GPS:OK
+    // BATT:11.6    GPS:ORI
     // MODE:MANUAL  NAV:OFF
     // REVER+++    GEAR:255
     //        STEER >>>
     // ====================
 
-    // Manual estop (SM_MANU_ESTOP):
+    // SM_MANUAL2:
     // ====================
-    // BATT:11.6    GPS:OK
-    // MODE:MANUAL  NAV:OFF
-    // REVER       GEAR:255
-    //    *** E-STOP ***
-    // ====================
-
-    // Enter navigation mode, first page (SM_NAVIGATE1):
-    // ====================
-    // BATT:11.6    GPS:OK
-    // MODE:AUTO    NAV:ON
-    // ACCEL+++    GEAR:255
-    //        STEER >>>
-    // ====================
-
-    // Enter navigation mode, second page (SM_NAVIGATE2):
-    // ====================
-    // BATT:11.6    GPS:OK
-    // MODE:AUTO    NAV:ON
-    // WPT:1/5     VEL:0.6
-    // DIST:20.1
-    // ====================
-
-    // Press E-stop (SM_NAV_ESTOP):
-    // ====================
-    // BATT:11.6    GPS:OK
-    // MODE:MANUAL  NAV:OFF
-    // 
-    //    *** E-STOP ***
-    // ====================
-
-    // Debug mode1 (SM_DEBUG1):
-    // ====================
-    // BATT:11.6    GPS:OK
-    // MODE:MANUAL  NAV:OFF
-    // L:-255       CONN:OK
+    // CMD X:0.5   YAW:-0.2
+    // RPY X:0.4   YAW:-0.6
+    // L:-255     SEQ:12345
     // R:100      DEBUG:128
     // ====================
 
-    // Debug mode2 (SM_DEBUG2):
+    // SM_MANUAL3:
     // ====================
-    // GPS INIT:1  VALID:1
-    // ORIGIN:1  SEQ:12345
-    // LAT:51D35.12345M  N
-    // LON:113D30.56123M W
+    // GPS:ON       VALID:1
+    // CPS:OK     YAW: 1.32
+    // LAT:51D35.12345M   N
+    // LON:113D30.56123M  W
+    // ====================
+
+    // SM_MANUAL4:
+    // ====================
+    // GPS:ORI      VALID:1
+    // CPS:OK     YAW: 1.32
+    // X:123.45
+    // Y:-123.45
+    // ====================
+
+    // SM_NAVIGATE1:
+    // ====================
+    // BATT:11.6    GPS:ORI
+    // MODE:AUTO     NAV:ON
+    // GOAL:12.3   GEAR:255
+    // RPY X:0.4   YAW:-0.6
+    // ====================
+
+    // SM_NAVIGATE2:
+    // ====================
+    // WPT:1/5    GOAL:20.1
+    // CPS:OK     YAW: 1.32
+    // X:123.45
+    // Y:-123.45
+    // ====================
+
+    // SM_NAVIGATE3:
+    // ====================
+    // GPS:ORI      VALID:1
+    // CPS:OK     YAW: 1.32
+    // LAT:51D35.12345M   N
+    // LON:113D30.56123M  W
     // ====================
 }
 
@@ -714,10 +826,11 @@ static void generate_steer_effect(char *out, int sz) {
     // 0    5 7      14   19
     char arrows[6];
     int i;
-    int num_arrows = (int) roundf(fabs(Station.cmd_yaw_reply) / MAX_ANGULAR_VEL * 6.0);
-    num_arrows = max(0, min(5, num_arrows));
+    // int num_arrows = (int) roundf(fabs(Station.cmd_yaw_reply) / MAX_ANGULAR_VEL * 6.0);
+    // num_arrows = max(0, min(5, num_arrows));
+    int num_arrows = map(abs(Station.cmd_yaw_int), 0, 127, 0, 5);
 
-    if(Station.cmd_yaw_reply >= 0) {
+    if(Station.cmd_yaw_int >= 0) {
         // Right rotation
         for(i = 0; i < num_arrows; i++) {
             arrows[i] = '>';
@@ -754,9 +867,12 @@ static void generate_throttle_effect(char *out, int sz) {
     int num_arrows;
     int i;
     char arrows[6];
+    char right_align[LCD_BUF_SIZE];
 
-    num_arrows = (int) roundf(fabs(Station.cmd_x_reply) / MAX_LINEAR_VEL * 6.0);
-    num_arrows = max(0, min(5, num_arrows));
+    // num_arrows = (int) roundf(fabs(Station.cmd_x_reply) / MAX_LINEAR_VEL * 6.0);
+    // num_arrows = max(0, min(5, num_arrows));
+
+    num_arrows = map(abs(Station.cmd_x_int), 0, 127, 0, 5);
 
     // Clear output:
     memset(arrows, ' ', 6);
@@ -766,12 +882,18 @@ static void generate_throttle_effect(char *out, int sz) {
     }
     arrows[5] = '\0';
 
-    if(Station.cmd_x_reply >= 0) {
+    if(Station.cmd_x_int >= 0) {
         // Forward acceleration
-        snprintf(out, sz, "ACCEL%s    GEAR:%d", arrows, Station.gear);
+        // snprintf(out, sz, "ACCEL%s    GEAR:%d", arrows, Station.gear);
+        snprintf(out, sz, "ACCEL%s", arrows);
+        snprintf(right_align, LCD_BUF_SIZE, "GEAR:%d", Station.gear);
+        right_align_overlay(right_align, out, sz);
     } else {
         // Reverse
-        snprintf(out, sz, "REVER%s    GEAR:%d", arrows, Station.gear);
+        // snprintf(out, sz, "REVER%s    GEAR:%d", arrows, Station.gear);
+        snprintf(out, sz, "REVER%s", arrows);
+        snprintf(right_align, LCD_BUF_SIZE, "GEAR:%d", Station.gear);
+        right_align_overlay(right_align, out, sz);
     }
 }
 

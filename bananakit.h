@@ -49,7 +49,7 @@
 // Joystick module:
 #define JOY_VRX             A2
 #define JOY_VRY             A3
-#define JOY_SW              3
+#define JOY_SW              4
 #define JOY_PUSH_BUTTON_0   6
 #define JOY_PUSH_BUTTON_1   5
 
