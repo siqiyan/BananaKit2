@@ -77,8 +77,9 @@ typedef struct __attribute__((__packed__)) {
         uint8_t gps_initialized:        1;
         uint8_t lat_north_positive:     1;
         uint8_t lon_east_positive:      1;
+        uint8_t origin_initialized:     1;
         uint8_t compass_valid:          1;
-        uint8_t reserved:               3; // fill the byte
+        uint8_t reserved:               2; // fill the byte
     } status;
 
     int16_t sequence_id;

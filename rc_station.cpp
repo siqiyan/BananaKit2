@@ -303,6 +303,7 @@ static void process_gps_frame(const gps_status_t *frame) {
     Station.status.gps_initialized                  = frame->status.gps_initialized;
     Station.status.gps_data_valid                   = frame->status.gps_data_valid;
     Station.status.compass_valid                    = frame->status.compass_valid;
+    Station.status.gps_origin_set                   = frame->status.origin_initialized;
     Station.vehicle_coordinate.lat_north_positive   = frame->status.lat_north_positive;
     Station.vehicle_coordinate.lon_east_positive    = frame->status.lon_east_positive;
     Station.vehicle_coordinate.lat_degree           = frame->lat_degree;
