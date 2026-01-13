@@ -54,6 +54,7 @@ typedef struct __rc_station__ {
         uint8_t compass_valid:          1;
         uint8_t is_connected:           1;
         uint8_t cmd_auto_mode:          1;
+        uint8_t cmd_manu_mode:          1;
         uint8_t auto_mode:              1;
         uint8_t cmd_navigate_start:     1;
         uint8_t cmd_navigate_cancel:    1;

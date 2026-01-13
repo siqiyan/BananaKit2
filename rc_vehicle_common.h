@@ -55,7 +55,7 @@ typedef struct __attribute__((__packed__)) {
 
     struct __attribute__((__packed__)) {
         uint8_t left_dir:       1;
-        uint8_t right_dir:      1;      
+        uint8_t right_dir:      1;
         uint8_t reserved:       6;
     } status;
 
@@ -109,7 +109,8 @@ typedef struct __attribute__((__packed__)) {
 
     struct __attribute__((__packed__)) {
         uint8_t navigate_running:       1;
-        uint8_t reserved:               7;
+        uint8_t auto_mode:              1;
+        uint8_t reserved:               6;
     } status;
 
     int16_t sequence_id;
@@ -123,12 +124,12 @@ typedef struct __attribute__((__packed__)) {
     uint8_t header;
 
     struct __attribute__((__packed__)) {
-        // uint8_t cmd_estop:              1;
         uint8_t cmd_auto_mode:          1;
+        uint8_t cmd_manu_mode:          1;
         uint8_t cmd_navigate_start:     1;
         uint8_t cmd_navigate_cancel:    1;
         uint8_t cmd_set_origin:         1;
-        uint8_t reserved:               4;
+        uint8_t reserved:               3;
     } status;
 
     int16_t sequence_id;

@@ -326,6 +326,7 @@ static void process_navi_frame(const navigation_status_t *frame) {
     }
     sequenceID++;
     Station.status.navigate_running     = frame->status.navigate_running;
+    Station.status.auto_mode            = frame->status.auto_mode;
     Station.dist2goal                   = frame->dist2goal;
     Station.waypoint_index              = frame->waypoint_index;
     Station.waypoint_list_sz            = frame->waypoint_list_sz;
@@ -384,12 +385,11 @@ static void generate_cmd_packet(command_frame_t *frame) {
     frame->status.cmd_navigate_start  = Station.status.cmd_navigate_start;
     frame->status.cmd_navigate_cancel = Station.status.cmd_navigate_cancel;
     frame->status.cmd_auto_mode       = Station.status.cmd_auto_mode;
+    frame->status.cmd_manu_mode       = Station.status.cmd_manu_mode;
     frame->status.cmd_set_origin      = Station.status.cmd_set_origin;
-    if(!Station.status.cmd_auto_mode) {
-        frame->cmd_x_int                = Station.cmd_x_int;
-        frame->cmd_yaw_int              = Station.cmd_yaw_int;
-    }
-    frame->gear                     = Station.gear;
+    frame->cmd_x_int                  = Station.cmd_x_int;
+    frame->cmd_yaw_int                = Station.cmd_yaw_int;
+    frame->gear                       = Station.gear;
     frame->checksum = compute_checksum((char *) frame, sizeof(command_frame_t));
 }
 
@@ -422,9 +422,18 @@ static void update_state_machine(void) {
         case SM_MANUAL2:
         case SM_MANUAL3:
         case SM_MANUAL4:
-            if(Station.status.button_right_pressed) {
+            if(Station.status.button_left_pressed && Station.status.button_right_pressed) {
                 // Request to start navigation:
                 Station.status.cmd_navigate_start = 1;
+            } else if(Station.status.button_right_pressed) {
+                // Switch between auto/manual mode:
+                if(Station.status.auto_mode) {
+                    Station.status.cmd_auto_mode = 0;
+                    Station.status.cmd_manu_mode = 1;
+                } else {
+                    Station.status.cmd_manu_mode = 0;
+                    Station.status.cmd_auto_mode = 1;
+                }
             } else if(Station.status.button_left_pressed) {
                 // Loop info screen:
                 if(Station.sm_state == SM_MANUAL1) {
@@ -436,7 +445,8 @@ static void update_state_machine(void) {
                 } else if(Station.sm_state == SM_MANUAL4) {
                     Station.sm_state = SM_MANUAL1;
                 }
-            } else if(Station.status.button_joy_pressed) {
+            }
+            if(Station.status.button_joy_pressed) {
                 // Request to set GPS origin:
                 Station.status.cmd_set_origin = 1;
             }
@@ -453,9 +463,18 @@ static void update_state_machine(void) {
         case SM_NAVIGATE1:
         case SM_NAVIGATE2:
         case SM_NAVIGATE3:
-            if(Station.status.button_right_pressed) {
+            if(Station.status.button_left_pressed && Station.status.button_right_pressed) {
                 // Request to stop navigation:
                 Station.status.cmd_navigate_cancel = 1;
+            } else if(Station.status.button_right_pressed) {
+                // Switch between auto/manual mode:
+                if(Station.status.auto_mode) {
+                    Station.status.cmd_auto_mode = 0;
+                    Station.status.cmd_manu_mode = 1;
+                } else {
+                    Station.status.cmd_manu_mode = 0;
+                    Station.status.cmd_auto_mode = 1;
+                }
             } else if(Station.status.button_left_pressed) {
                 // Loop info screen:
                 if(Station.sm_state == SM_NAVIGATE1) {
@@ -465,7 +484,8 @@ static void update_state_machine(void) {
                 } else if(Station.sm_state == SM_NAVIGATE3) {
                     Station.sm_state = SM_NAVIGATE1;
                 }
-            } else if(Station.cmd_x_int != 0 || Station.cmd_yaw_int != 0) {
+            }
+            if(Station.cmd_x_int != 0 || Station.cmd_yaw_int != 0) {
                 // Joystick moved, request to switch manual mode (but don't stop navigation):
                 Station.status.cmd_auto_mode = 0;
             }
@@ -582,7 +602,7 @@ static void render(void) {
                 IO.lcd_buf,
                 LCD_BUF_SIZE,
                 "MODE:%s",
-                Station.status.cmd_auto_mode ? "AUTO" : "MANU"
+                Station.status.auto_mode ? "AUTO" : "MANUAL"
             );
             snprintf(
                 align_buf,
