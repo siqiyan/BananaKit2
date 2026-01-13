@@ -45,7 +45,7 @@ static void incoming_packet_handle() {
 }
 
 void rc_station_init(void) {
-    Serial.begin(9600);
+    // Serial.begin(9600);
 
     // NRF24 Initialize:
     RF_radio.begin();
@@ -158,7 +158,8 @@ static void update_keyboard_inputs(void) {
     // float axis_range_f;
     int16_t raw_offset;
 
-    raw_offset = analogRead(JOY_VRY) - Station.joy_neutral_pos_y;
+    // raw_offset = analogRead(JOY_VRY) - Station.joy_neutral_pos_y;
+    raw_offset = Station.joy_neutral_pos_y - analogRead(JOY_VRY);
     if (abs(raw_offset) < DEADZONE_JOY) {
         Station.cmd_yaw_int = 0;
     } else {
