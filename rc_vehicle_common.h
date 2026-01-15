@@ -14,12 +14,12 @@
 #define WHEEL_TRACK                 0.5
 #define ENCODER_RESOLUTION          7392
 #define MAX_NAVIGATION_RANGE        200.0   // meter
-#define SPEED_REDUCTION_RANGE       3.0     // meter, full speed if goal dist exceed this range
+// #define SPEED_REDUCTION_RANGE       3.0     // meter, full speed if goal dist exceed this range
 #define GOAL_REACH_RANGE            0.5     // meter, tolerance value to determine if goal is reached range
 #define MAX_LINEAR_VEL              0.08     // meter/sec
 // #define MIN_LINEAR_VEL              0.02     // meter/sec, reduction speed, for auto mode
 #define MAX_ANGULAR_VEL             0.785    // rad/s, auto mode and manual mode
-#define RAMP_LINEAR_ACCEL           5.0     // meter/sec^2
+// #define RAMP_LINEAR_ACCEL           5.0     // meter/sec^2
 #define MAX_WAYPOINT_SZ             10
 
 // Convert between float and integer for data communication

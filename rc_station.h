@@ -68,6 +68,8 @@ typedef struct __rc_station__ {
 
     int8_t              cmd_x_int;
     int8_t              cmd_yaw_int;
+    // float               cmd_x_percent;
+    // float               cmd_y_percent;
     float               cmd_x_reply;
     float               cmd_yaw_reply;
     int16_t             battery_adc_value;
@@ -86,6 +88,8 @@ typedef struct __rc_station__ {
     int8_t              waypoint_index;
     int8_t              waypoint_list_sz;
     uint8_t             debug_code;
+    int16_t vry_raw;
+    int16_t raw_offset;
     station_state_machine_t  sm_state;
 } rc_station_t;
 

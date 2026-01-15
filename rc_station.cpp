@@ -46,7 +46,7 @@ static void incoming_packet_handle() {
 }
 
 void rc_station_init(void) {
-    // Serial.begin(9600);
+    Serial.begin(9600);
 
     // NRF24 Initialize:
     RF_radio.begin();
@@ -86,7 +86,8 @@ void rc_station_init(void) {
     Station.joy_neutral_pos_x           = 635;
     Station.joy_neutral_pos_y           = 645;
     Station.debug_code                  = 0;
-    Station.sm_state                    = SM_UNCONNECT;
+    // Station.sm_state                    = SM_UNCONNECT;
+    Station.sm_state = SM_MANUAL1;
 
     // Init joystick:
     pinMode(JOY_SW, INPUT_PULLUP);
@@ -196,6 +197,15 @@ void rc_station_exit(void) {
 void rc_station_interrupt(void) {
 }
 
+// int8_t fmap(float value, float input_lower, float input_upper, float output_lower, float output_upper) {
+//     float fval = (value - input_lower) / (input_upper - input_lower) * (output_upper - output_lower) + output_lower;
+//     return roundf(fval);
+// }
+
+// int8_t fmap_simp(float value, float input_range, float output_range) {
+//     float fval = value / input_range * output_range;
+//     return roundf(fval);
+// }
 
 ///////////////////////////////////////////////////////////////////
 // Local functions:
@@ -207,15 +217,38 @@ static void update_keyboard_inputs(void) {
     // float axis_range_f;
     int16_t raw_offset;
 
+    // Joystick Y-Axis:
+    //     Left most = 0
+    //     Right most = 1023
+    // Right hand coordinate:
+    //     Left rotate > 0
+    //     Right rotate < 0
+    // 
     // raw_offset = analogRead(JOY_VRY) - Station.joy_neutral_pos_y;
+    // Station.vry_raw = analogRead(JOY_VRY);
     raw_offset = Station.joy_neutral_pos_y - analogRead(JOY_VRY);
-    if (abs(raw_offset) < DEADZONE_JOY) {
+    // raw_offset = Station.joy_neutral_pos_y - Station.vry_raw;
+    Station.raw_offset = raw_offset;
+    if(abs(raw_offset) < DEADZONE_JOY) {
         Station.cmd_yaw_int = 0;
     } else {
-        if (raw_offset > 0) {
-            Station.cmd_yaw_int = (int8_t)map(raw_offset, DEADZONE_JOY, 1023 - Station.joy_neutral_pos_y, 0, 127);
+        if (raw_offset >= 0) {
+            // Turn left (right hand, positive yaw):
+            // Input Range: [DEADZONE_JOY, joy_neutral_pos_y]
+            // Output: [0, 127]
+            // Station.cmd_yaw_int = (int8_t)map(raw_offset, DEADZONE_JOY, 1023 - Station.joy_neutral_pos_y, 0, 127);
+            Station.cmd_yaw_int = (int8_t)map(raw_offset, DEADZONE_JOY, Station.joy_neutral_pos_y, 0, 127);
+            // Station.cmd_yaw_int = (int8_t)fmap_simp((float) raw_offset, 645.0, 127.0);
+            // Station.cmd_yaw_int = (int8_t) (((float) raw_offset) / 645.0 * 127.0);
+            // Station.cmd_yaw_percent = ((float) raw_offset) / ((float) Station.joy_neutral_pos_y);
         } else {
-            Station.cmd_yaw_int = (int8_t)map(raw_offset, -Station.joy_neutral_pos_y, -DEADZONE_JOY, -128, 0);
+            // Turn right (right hand, negative yaw):
+            // Input Range: [joy_neutral_pos_y - 1023, -DEADZONE_JOY-1]
+            // Output: [-128, -1]
+            // Station.cmd_yaw_int = (int8_t)map(raw_offset, -Station.joy_neutral_pos_y, -DEADZONE_JOY, -128, 0);
+            Station.cmd_yaw_int = (int8_t)map(raw_offset, Station.joy_neutral_pos_y - 1023, -DEADZONE_JOY - 1, -128, -1);
+            // Station.cmd_yaw_int = (int8_t) ((((float) raw_offset) + 378.0) / 378.0 * 127.0 - 128.0);
+            // Station.cmd_yaw_percent = ((float) raw_offset) / (((float) Station.joy_neutral_pos_y) - 1023.0);
         }
     }
 
@@ -897,19 +930,27 @@ static void generate_steer_effect(char *out, int sz) {
     // 0    5 7      14   19
     char arrows[6];
     int i;
+    int num_arrows;
     // int num_arrows = (int) roundf(fabs(Station.cmd_yaw_reply) / MAX_ANGULAR_VEL * 6.0);
     // num_arrows = max(0, min(5, num_arrows));
-    int num_arrows = map(abs(Station.cmd_yaw_int), 0, 127, 0, 5);
+
+    // cmd_yaw_int:
+    //     left  [0, 127]
+    //     right [-1, -128]
 
     if(Station.cmd_yaw_int < 0) {
         // Right rotation
+        num_arrows = map(abs(Station.cmd_yaw_int) - 1, 0, 128, 0, 6);
+        // num_arrows = ((float) Station.cmd_yaw_int) / 
         for(i = 0; i < num_arrows; i++) {
             arrows[i] = '>';
         }
         arrows[i] = '\0';
-        snprintf(out, sz, "       ROTATE %s ", arrows);
+        // snprintf(out, sz, "       ROTATE %s ", arrows);
+        snprintf(out, sz, "  %d  %d %s ", Station.raw_offset, Station.cmd_yaw_int, arrows);
     } else {
         // Left rotation
+        num_arrows = map(Station.cmd_yaw_int, 0, 128, 0, 6);
         // <<<<<0
         // ^    ^
         // 0    5
@@ -924,7 +965,8 @@ static void generate_steer_effect(char *out, int sz) {
             arrows[i] = '<';
         }
         arrows[i] = '\0';
-        snprintf(out, sz, " %s ROTATE", arrows);
+        // snprintf(out, sz, " %s ROTATE", arrows);
+        snprintf(out, sz, " %s %d %d", arrows, Station.raw_offset, Station.cmd_yaw_int);
     }
 }
 
@@ -940,10 +982,10 @@ static void generate_throttle_effect(char *out, int sz) {
     char arrows[6];
     char right_align[LCD_BUF_SIZE];
 
-    // num_arrows = (int) roundf(fabs(Station.cmd_x_reply) / MAX_LINEAR_VEL * 6.0);
-    // num_arrows = max(0, min(5, num_arrows));
+    num_arrows = (int) roundf(((float) abs(Station.cmd_x_int)) / 127.0 * 6.0);
+    num_arrows = max(0, min(5, num_arrows));
 
-    num_arrows = map(abs(Station.cmd_x_int), 0, 127, 0, 5);
+    // num_arrows = map(abs(Station.cmd_x_int), 0, 127, 0, 5);
 
     // Clear output:
     memset(arrows, ' ', 6);
