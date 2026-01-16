@@ -22,6 +22,10 @@
 // #define RAMP_LINEAR_ACCEL           5.0     // meter/sec^2
 #define MAX_WAYPOINT_SZ             10
 
+// Used for the dir binray bit:
+#define DIR_FORWARD     0
+#define DIR_BACKWARD    1
+
 // Convert between float and integer for data communication
 // After conversion to integer the number after float point will be discard during transmiting
 // To keep more precision increase the constant, but on Arduino Nano the total float precision is 6-7 digits (if I remember)

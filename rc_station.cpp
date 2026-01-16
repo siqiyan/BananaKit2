@@ -308,12 +308,12 @@ static void process_status_packet(const vehicle_status_t *frame) {
     Station.cmd_yaw_reply           = frame->cmd_yaw_reply;
     Station.left_pwm                = frame->left_pwm;
     Station.right_pwm               = frame->right_pwm;
-    if(frame->status.left_dir) {
+    if(frame->status.left_dir == DIR_FORWARD) {
         Station.left_pwm_signed     = ((int16_t) frame->left_pwm);
     } else {
         Station.left_pwm_signed     = -((int16_t) frame->left_pwm);
     }
-    if(frame->status.right_dir) {
+    if(frame->status.right_dir == DIR_FORWARD) {
         Station.right_pwm_signed    = ((int16_t) frame->right_pwm);
     } else {
         Station.right_pwm_signed    = -((int16_t) frame->right_pwm);
@@ -648,7 +648,7 @@ static void render(void) {
             IO.lcd_refresh_callback();
             break;
         case SM_MANUAL2:
-            float2str(Station.cmd_x_reply, floatbuf, LCD_BUF_SIZE, 1);
+            float2str(Station.cmd_x_reply, floatbuf, LCD_BUF_SIZE, 3);
             snprintf(
                 IO.lcd_buf,
                 LCD_BUF_SIZE,
@@ -946,8 +946,8 @@ static void generate_steer_effect(char *out, int sz) {
             arrows[i] = '>';
         }
         arrows[i] = '\0';
-        // snprintf(out, sz, "       ROTATE %s ", arrows);
-        snprintf(out, sz, "  %d  %d %s ", Station.raw_offset, Station.cmd_yaw_int, arrows);
+        snprintf(out, sz, "       ROTATE %s ", arrows);
+        // snprintf(out, sz, "  %d  %d %s ", Station.raw_offset, Station.cmd_yaw_int, arrows);
     } else {
         // Left rotation
         num_arrows = map(Station.cmd_yaw_int, 0, 128, 0, 6);
@@ -965,8 +965,8 @@ static void generate_steer_effect(char *out, int sz) {
             arrows[i] = '<';
         }
         arrows[i] = '\0';
-        // snprintf(out, sz, " %s ROTATE", arrows);
-        snprintf(out, sz, " %s %d %d", arrows, Station.raw_offset, Station.cmd_yaw_int);
+        snprintf(out, sz, " %s ROTATE", arrows);
+        // snprintf(out, sz, " %s %d %d", arrows, Station.raw_offset, Station.cmd_yaw_int);
     }
 }
 
@@ -982,10 +982,10 @@ static void generate_throttle_effect(char *out, int sz) {
     char arrows[6];
     char right_align[LCD_BUF_SIZE];
 
-    num_arrows = (int) roundf(((float) abs(Station.cmd_x_int)) / 127.0 * 6.0);
-    num_arrows = max(0, min(5, num_arrows));
+    // num_arrows = (int) roundf(((float) abs(Station.cmd_x_int)) / 127.0 * 6.0);
+    // num_arrows = max(0, min(5, num_arrows));
 
-    // num_arrows = map(abs(Station.cmd_x_int), 0, 127, 0, 5);
+    num_arrows = map(abs(Station.cmd_x_int), 0, 128, 0, 6);
 
     // Clear output:
     memset(arrows, ' ', 6);
