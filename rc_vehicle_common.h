@@ -119,6 +119,7 @@ typedef struct __attribute__((__packed__)) {
 
     int16_t sequence_id;
     float dist2goal;
+    float yaw_err;
     int8_t waypoint_index;
     int8_t waypoint_list_sz;
     uint8_t checksum;
@@ -139,8 +140,6 @@ typedef struct __attribute__((__packed__)) {
     int16_t sequence_id;
     int8_t cmd_x_int;
     int8_t cmd_yaw_int;
-    // float twist_x;
-    // float twist_yaw;
     uint8_t gear;
     uint8_t checksum;
 } command_frame_t;

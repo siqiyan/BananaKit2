@@ -13,7 +13,6 @@
 // #define UART_SPEED_BPS 115200
 #define MAIN_LOOP_PERIOD        100 // 10Hz, 100ms period
 #define MAIN_LOOP_MAX           150 // upper bound, trigger warning
-// #define RENDER_LOOP_PERIOD      500 // 2Hz
 
 typedef enum {
     SM_UNCONNECT,
@@ -25,24 +24,6 @@ typedef enum {
     SM_NAVIGATE2,
     SM_NAVIGATE3
 } station_state_machine_t;
-
-// typedef struct {
-//     uint8_t navigate_running:       1;
-//     uint8_t gps_data_valid:         1;
-//     uint8_t gps_initialized:        1;
-//     uint8_t gps_origin_set:         1;
-//     uint8_t is_connected:           1;
-//     uint8_t cmd_auto_mode:          1;
-//     uint8_t auto_mode:              1;
-//     uint8_t cmd_navigate_start:     1;
-//     uint8_t cmd_navigate_cancel:    1;
-//     uint8_t cmd_set_origin:         1;
-//     uint8_t sync_with_vehicle:      1;
-//     uint8_t button_left_pressed:    1;
-//     uint8_t button_right_pressed:   1;
-//     uint8_t button_joy_pressed:     1;
-//     uint8_t recv_header_err:        1;
-// } rc_station_status_t;
 
 // RC station variables:
 typedef struct __rc_station__ {
@@ -68,8 +49,6 @@ typedef struct __rc_station__ {
 
     int8_t              cmd_x_int;
     int8_t              cmd_yaw_int;
-    // float               cmd_x_percent;
-    // float               cmd_y_percent;
     float               cmd_x_reply;
     float               cmd_yaw_reply;
     int16_t             battery_adc_value;
@@ -85,11 +64,10 @@ typedef struct __rc_station__ {
     int16_t             left_pwm_signed;
     int16_t             right_pwm_signed;
     float               dist2goal;
+    float               yaw_err;
     int8_t              waypoint_index;
     int8_t              waypoint_list_sz;
     uint8_t             debug_code;
-    int16_t vry_raw;
-    int16_t raw_offset;
     station_state_machine_t  sm_state;
 } rc_station_t;
 

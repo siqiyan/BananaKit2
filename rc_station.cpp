@@ -197,24 +197,10 @@ void rc_station_exit(void) {
 void rc_station_interrupt(void) {
 }
 
-// int8_t fmap(float value, float input_lower, float input_upper, float output_lower, float output_upper) {
-//     float fval = (value - input_lower) / (input_upper - input_lower) * (output_upper - output_lower) + output_lower;
-//     return roundf(fval);
-// }
-
-// int8_t fmap_simp(float value, float input_range, float output_range) {
-//     float fval = value / input_range * output_range;
-//     return roundf(fval);
-// }
-
 ///////////////////////////////////////////////////////////////////
 // Local functions:
 #define DEADZONE_JOY 10
 static void update_keyboard_inputs(void) {
-    // float analog_value_f;
-    // int16_t volt0_adc;
-    // float max_linear_velocity;
-    // float axis_range_f;
     int16_t raw_offset;
 
     // Joystick Y-Axis:
@@ -224,11 +210,7 @@ static void update_keyboard_inputs(void) {
     //     Left rotate > 0
     //     Right rotate < 0
     // 
-    // raw_offset = analogRead(JOY_VRY) - Station.joy_neutral_pos_y;
-    // Station.vry_raw = analogRead(JOY_VRY);
     raw_offset = Station.joy_neutral_pos_y - analogRead(JOY_VRY);
-    // raw_offset = Station.joy_neutral_pos_y - Station.vry_raw;
-    Station.raw_offset = raw_offset;
     if(abs(raw_offset) < DEADZONE_JOY) {
         Station.cmd_yaw_int = 0;
     } else {
@@ -236,19 +218,12 @@ static void update_keyboard_inputs(void) {
             // Turn left (right hand, positive yaw):
             // Input Range: [DEADZONE_JOY, joy_neutral_pos_y]
             // Output: [0, 127]
-            // Station.cmd_yaw_int = (int8_t)map(raw_offset, DEADZONE_JOY, 1023 - Station.joy_neutral_pos_y, 0, 127);
             Station.cmd_yaw_int = (int8_t)map(raw_offset, DEADZONE_JOY, Station.joy_neutral_pos_y, 0, 127);
-            // Station.cmd_yaw_int = (int8_t)fmap_simp((float) raw_offset, 645.0, 127.0);
-            // Station.cmd_yaw_int = (int8_t) (((float) raw_offset) / 645.0 * 127.0);
-            // Station.cmd_yaw_percent = ((float) raw_offset) / ((float) Station.joy_neutral_pos_y);
         } else {
             // Turn right (right hand, negative yaw):
             // Input Range: [joy_neutral_pos_y - 1023, -DEADZONE_JOY-1]
             // Output: [-128, -1]
-            // Station.cmd_yaw_int = (int8_t)map(raw_offset, -Station.joy_neutral_pos_y, -DEADZONE_JOY, -128, 0);
             Station.cmd_yaw_int = (int8_t)map(raw_offset, Station.joy_neutral_pos_y - 1023, -DEADZONE_JOY - 1, -128, -1);
-            // Station.cmd_yaw_int = (int8_t) ((((float) raw_offset) + 378.0) / 378.0 * 127.0 - 128.0);
-            // Station.cmd_yaw_percent = ((float) raw_offset) / (((float) Station.joy_neutral_pos_y) - 1023.0);
         }
     }
 
@@ -361,6 +336,7 @@ static void process_navi_frame(const navigation_status_t *frame) {
     Station.status.navigate_running     = frame->status.navigate_running;
     Station.status.auto_mode            = frame->status.auto_mode;
     Station.dist2goal                   = frame->dist2goal;
+    Station.yaw_err                     = frame->yaw_err;
     Station.waypoint_index              = frame->waypoint_index;
     Station.waypoint_list_sz            = frame->waypoint_list_sz;
     Station.status.is_connected = 1;
@@ -543,14 +519,12 @@ static void render(void) {
         case SM_MANUAL1:
         case SM_NAVIGATE1:
             float2str(GET_ADC_VOLT(Station.battery_adc_value), floatbuf, LCD_BUF_SIZE, 1);
-            // memset(IO.lcd_buf, ' ', LCD_BUF_SIZE);
             snprintf(
                 IO.lcd_buf,
                 LCD_BUF_SIZE,
                 "BATT:%s",
                 Station.status.is_connected ? floatbuf : "NA"
             );
-            // IO.lcd_buf[strlen(IO.lcd_buf)] = ' ';
             snprintf(
                 align_buf,
                 ALIGN_BUF_SIZE,
@@ -559,11 +533,7 @@ static void render(void) {
                     Station.status.gps_origin_set ? "ORI" : "OK"
                 ) : "NA"
             );
-
             right_align_overlay(align_buf, IO.lcd_buf, LCD_BUF_SIZE);
-
-            IO.flags = LCD_REFRESH_LINE0;
-            IO.lcd_refresh_callback();
             break;
         case SM_MANUAL2:
             snprintf(
@@ -579,8 +549,6 @@ static void render(void) {
                 Station.cmd_yaw_int
             );
             right_align_overlay(align_buf, IO.lcd_buf, LCD_BUF_SIZE);
-            IO.flags = LCD_REFRESH_LINE0;
-            IO.lcd_refresh_callback();
             break;
         case SM_MANUAL3:
         case SM_MANUAL4:
@@ -600,8 +568,6 @@ static void render(void) {
                 Station.status.gps_data_valid
             );
             right_align_overlay(align_buf, IO.lcd_buf, LCD_BUF_SIZE);
-            IO.flags = LCD_REFRESH_LINE0;
-            IO.lcd_refresh_callback();
             break;
         case SM_NAVIGATE2:
             snprintf(
@@ -619,12 +585,13 @@ static void render(void) {
                 floatbuf
             );
             right_align_overlay(align_buf, IO.lcd_buf, LCD_BUF_SIZE);
-            IO.flags = LCD_REFRESH_LINE0;
-            IO.lcd_refresh_callback();
             break;
         default:
+            IO.lcd_buf[0] = '\0';
             break; 
     }
+    IO.flags = LCD_REFRESH_LINE0;
+    IO.lcd_refresh_callback();
 
     // Line 1:
     switch(Station.sm_state) {
@@ -644,8 +611,6 @@ static void render(void) {
                 Station.status.navigate_running ? "ON " : "OFF"
             );
             right_align_overlay(align_buf, IO.lcd_buf, LCD_BUF_SIZE);
-            IO.flags = LCD_REFRESH_LINE1;
-            IO.lcd_refresh_callback();
             break;
         case SM_MANUAL2:
             float2str(Station.cmd_x_reply, floatbuf, LCD_BUF_SIZE, 3);
@@ -663,8 +628,6 @@ static void render(void) {
                 floatbuf
             );
             right_align_overlay(align_buf, IO.lcd_buf, LCD_BUF_SIZE);
-            IO.flags = LCD_REFRESH_LINE1;
-            IO.lcd_refresh_callback();
             break;
         case SM_MANUAL3:
         case SM_MANUAL4:
@@ -684,20 +647,19 @@ static void render(void) {
                 floatbuf
             );
             right_align_overlay(align_buf, IO.lcd_buf, LCD_BUF_SIZE);
-            IO.flags = LCD_REFRESH_LINE1;
-            IO.lcd_refresh_callback();
             break;
         default:
+            IO.lcd_buf[0] = '\0';
             break;
     }
+    IO.flags = LCD_REFRESH_LINE1;
+    IO.lcd_refresh_callback();
 
     // Line 2:
     switch(Station.sm_state) {
         case SM_UNCONNECT:
         case SM_MANUAL1:
             generate_throttle_effect(IO.lcd_buf, LCD_BUF_SIZE);
-            IO.flags = LCD_REFRESH_LINE2;
-            IO.lcd_refresh_callback();
             break;
         case SM_MANUAL2:
             snprintf(
@@ -713,8 +675,6 @@ static void render(void) {
                 sequenceID
             );
             right_align_overlay(align_buf, IO.lcd_buf, LCD_BUF_SIZE);
-            IO.flags = LCD_REFRESH_LINE2;
-            IO.lcd_refresh_callback();
             break;
         case SM_MANUAL3:
         case SM_NAVIGATE3:
@@ -733,8 +693,6 @@ static void render(void) {
                 Station.vehicle_coordinate.lat_north_positive ? 'N' : 'S'
             );
             right_align_overlay(align_buf, IO.lcd_buf, LCD_BUF_SIZE);
-            IO.flags = LCD_REFRESH_LINE2;
-            IO.lcd_refresh_callback();
             break;
         case SM_MANUAL4:
         case SM_NAVIGATE2:
@@ -745,8 +703,14 @@ static void render(void) {
                 "X:%s",
                 floatbuf
             );
-            IO.flags = LCD_REFRESH_LINE2;
-            IO.lcd_refresh_callback();
+            float2str(Station.local_y, floatbuf, LCD_BUF_SIZE, 1);
+            snprintf(
+                align_buf,
+                ALIGN_BUF_SIZE,
+                "Y:%s",
+                floatbuf
+            );
+            right_align_overlay(align_buf, IO.lcd_buf, LCD_BUF_SIZE);
             break;
         case SM_NAVIGATE1:
             float2str(Station.dist2goal, floatbuf, LCD_BUF_SIZE, 1);
@@ -763,12 +727,13 @@ static void render(void) {
                 Station.gear
             );
             right_align_overlay(align_buf, IO.lcd_buf, LCD_BUF_SIZE);
-            IO.flags = LCD_REFRESH_LINE2;
-            IO.lcd_refresh_callback();
             break;
         default:
+            IO.lcd_buf[0] = '\0';
             break;
     }
+    IO.flags = LCD_REFRESH_LINE2;
+    IO.lcd_refresh_callback();
 
     // Line 3
     switch(Station.sm_state) {
@@ -778,13 +743,9 @@ static void render(void) {
                 LCD_BUF_SIZE,
                 "  *NOT CONNECTED*"
             );
-            IO.flags = LCD_REFRESH_LINE3;
-            IO.lcd_refresh_callback();
             break;
         case SM_MANUAL1:
             generate_steer_effect(IO.lcd_buf, LCD_BUF_SIZE);
-            IO.flags = LCD_REFRESH_LINE3;
-            IO.lcd_refresh_callback();
             break;
         case SM_MANUAL2:
             snprintf(
@@ -800,8 +761,6 @@ static void render(void) {
                 Station.debug_code
             );
             right_align_overlay(align_buf, IO.lcd_buf, LCD_BUF_SIZE);
-            IO.flags = LCD_REFRESH_LINE3;
-            IO.lcd_refresh_callback();
             break;
         case SM_MANUAL3:
         case SM_NAVIGATE3:
@@ -820,20 +779,31 @@ static void render(void) {
                 Station.vehicle_coordinate.lon_east_positive ? 'E' : 'W'
             );
             right_align_overlay(align_buf, IO.lcd_buf, LCD_BUF_SIZE);
-            IO.flags = LCD_REFRESH_LINE3;
-            IO.lcd_refresh_callback();
             break;
-        case SM_MANUAL4:
+        //case SM_MANUAL4:
+            //float2str(Station.std, floatbuf, LCD_BUF_SIZE, 1);
+            //snprintf(
+                //IO.lcd_buf,
+                //LCD_BUF_SIZE,
+                //"STD:%s",
+                //floatbuf
+            //);
+            //break;
         case SM_NAVIGATE2:
-            float2str(Station.local_y, floatbuf, LCD_BUF_SIZE, 1);
+            float2str(Station.yaw_err, floatbuf, LCD_BUF_SIZE, 1);
             snprintf(
                 IO.lcd_buf,
                 LCD_BUF_SIZE,
-                "Y:%s",
+                "ERR:%s",
                 floatbuf
             );
-            IO.flags = LCD_REFRESH_LINE3;
-            IO.lcd_refresh_callback();
+            snprintf(
+                align_buf,
+                ALIGN_BUF_SIZE,
+                "DEBUG:%d",
+                Station.debug_code
+            );
+            right_align_overlay(align_buf, IO.lcd_buf, LCD_BUF_SIZE);
             break;
         case SM_NAVIGATE1:
             float2str(Station.cmd_yaw_reply, floatbuf, LCD_BUF_SIZE, 1);
@@ -851,12 +821,13 @@ static void render(void) {
                 floatbuf
             );
             right_align_overlay(align_buf, IO.lcd_buf, LCD_BUF_SIZE);
-            IO.flags = LCD_REFRESH_LINE3;
-            IO.lcd_refresh_callback();
             break;
         default:
+            IO.lcd_buf[0] = '\0';
             break;
     }
+    IO.flags = LCD_REFRESH_LINE3;
+    IO.lcd_refresh_callback();
 
     // SM_UNCONNECT:
     // ====================
@@ -894,8 +865,8 @@ static void render(void) {
     // ====================
     // GPS:ORI      VALID:1
     // CPS:OK     YAW: 1.32
-    // X:123.45
-    // Y:-123.45
+    // X:123.45  Y:-1234.5
+    //
     // ====================
 
     // SM_NAVIGATE1:
@@ -910,8 +881,8 @@ static void render(void) {
     // ====================
     // WPT:1/5    GOAL:20.1
     // CPS:OK     YAW: 1.32
-    // X:123.45
-    // Y:-123.45
+    // X:123.45   Y:-1234.5
+    // ERR:3.14   DEBUG:255
     // ====================
 
     // SM_NAVIGATE3:
@@ -931,8 +902,6 @@ static void generate_steer_effect(char *out, int sz) {
     char arrows[6];
     int i;
     int num_arrows;
-    // int num_arrows = (int) roundf(fabs(Station.cmd_yaw_reply) / MAX_ANGULAR_VEL * 6.0);
-    // num_arrows = max(0, min(5, num_arrows));
 
     // cmd_yaw_int:
     //     left  [0, 127]
@@ -941,13 +910,11 @@ static void generate_steer_effect(char *out, int sz) {
     if(Station.cmd_yaw_int < 0) {
         // Right rotation
         num_arrows = map(abs(Station.cmd_yaw_int) - 1, 0, 128, 0, 6);
-        // num_arrows = ((float) Station.cmd_yaw_int) / 
         for(i = 0; i < num_arrows; i++) {
             arrows[i] = '>';
         }
         arrows[i] = '\0';
         snprintf(out, sz, "       ROTATE %s ", arrows);
-        // snprintf(out, sz, "  %d  %d %s ", Station.raw_offset, Station.cmd_yaw_int, arrows);
     } else {
         // Left rotation
         num_arrows = map(Station.cmd_yaw_int, 0, 128, 0, 6);
@@ -966,7 +933,6 @@ static void generate_steer_effect(char *out, int sz) {
         }
         arrows[i] = '\0';
         snprintf(out, sz, " %s ROTATE", arrows);
-        // snprintf(out, sz, " %s %d %d", arrows, Station.raw_offset, Station.cmd_yaw_int);
     }
 }
 
@@ -982,9 +948,6 @@ static void generate_throttle_effect(char *out, int sz) {
     char arrows[6];
     char right_align[LCD_BUF_SIZE];
 
-    // num_arrows = (int) roundf(((float) abs(Station.cmd_x_int)) / 127.0 * 6.0);
-    // num_arrows = max(0, min(5, num_arrows));
-
     num_arrows = map(abs(Station.cmd_x_int), 0, 128, 0, 6);
 
     // Clear output:
@@ -997,13 +960,11 @@ static void generate_throttle_effect(char *out, int sz) {
 
     if(Station.cmd_x_int >= 0) {
         // Forward acceleration
-        // snprintf(out, sz, "ACCEL%s    GEAR:%d", arrows, Station.gear);
         snprintf(out, sz, "ACCEL%s", arrows);
         snprintf(right_align, LCD_BUF_SIZE, "GEAR:%d", Station.gear);
         right_align_overlay(right_align, out, sz);
     } else {
         // Reverse
-        // snprintf(out, sz, "REVER%s    GEAR:%d", arrows, Station.gear);
         snprintf(out, sz, "REVER%s", arrows);
         snprintf(right_align, LCD_BUF_SIZE, "GEAR:%d", Station.gear);
         right_align_overlay(right_align, out, sz);
