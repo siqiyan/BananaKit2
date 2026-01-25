@@ -8,6 +8,7 @@
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
 #include <SparkFunCCS811.h>
+#include <DHT.h>
 #include "callstack.h"
 #include "menu.h"
 #include "bananakit_io.h"
@@ -20,21 +21,27 @@
 
 static void read_bme280_data(void);
 static void read_ccs811_data(void);
+static void read_dht22_data(void);
 static void lcd_refresh(void);
 
 static Adafruit_BME280 BME280_Sensor;
 static CCS811 CCS811_Sensor(CCS811_ADDR);
+static DHT DHT22_Sensor(DHT22_DAT_PIN, DHT22);
 
 typedef struct {
     struct {
         uint8_t bme280_ready: 1;
         uint8_t ccs811_ready: 1;
+        uint8_t dht22_ready:  1;
     } status;
 
-    float bme280_temprature;
+    float bme280_temperature;
     float bme280_pressure;
     float bme280_humidity;
     float bme280_altitude;
+
+    float dht22_temperature;
+    float dht22_humidity;
 
     uint16_t eco2_val;
     uint16_t tvoc_val;
@@ -57,6 +64,9 @@ void weather_module_init(void) {
     } else {
         Weather.status.ccs811_ready = 0;
     }
+
+    DHT22_Sensor.begin();
+    Weather.status.dht22_ready = 1;
 }
 
 node_status_t weather_module_update(void) {
@@ -64,6 +74,7 @@ node_status_t weather_module_update(void) {
 
     read_bme280_data();
     read_ccs811_data();
+    read_dht22_data();
     lcd_refresh();
 
     switch(IO.keypress) {
@@ -75,7 +86,7 @@ node_status_t weather_module_update(void) {
             break;
     }
 
-    delay(1000);
+    delay(2000);
     return next_status;
 }
 
@@ -102,6 +113,13 @@ static void read_ccs811_data(void) {
     }
 }
 
+static void read_dht22_data(void) {
+    if(Weather.status.dht22_ready) {
+        Weather.dht22_temperature = DHT22_Sensor.readTemperature();
+        Weather.dht22_humidity = DHT22_Sensor.readHumidity();
+    }
+}
+
 #define ALIGN_BUF_SIZE 21
 static void lcd_refresh(void) {
     char floatbuf[LCD_BUF_SIZE];
@@ -109,30 +127,38 @@ static void lcd_refresh(void) {
     IO.lcd_clear_callback();
 
     // Line 0:
-    float2str(Weather.bme280_temperature, floatbuf, LCD_BUF_SIZE, 1);
-    snprintf(
-        IO.lcd_buf,
-        LCD_BUF_SIZE,
-        "T:%s",
-        floatbuf
-    );
-    float2str(Weather.bme280_humidity, floatbuf, LCD_BUF_SIZE, 2);
-    snprintf(
-        align_buf,
-        ALIGN_BUF_SIZE,
-        "H:%s",
-        floatbuf
-    );
-    right_align_overlay(align_buf, IO.lcd_buf, LCD_BUF_SIZE);
+    if(!Weather.status.bme280_ready) {
+        snprintf(
+            IO.lcd_buf,
+            LCD_BUF_SIZE,
+            "BME280 fail"
+        );
+    } else {
+        float2str(Weather.bme280_temperature, floatbuf, LCD_BUF_SIZE, 1);
+        snprintf(
+            IO.lcd_buf,
+            LCD_BUF_SIZE,
+            "T:%s",
+            floatbuf
+        );
+        float2str(Weather.bme280_pressure, floatbuf, LCD_BUF_SIZE, 2);
+        snprintf(
+            align_buf,
+            ALIGN_BUF_SIZE,
+            "P:%shPa",
+            floatbuf
+        );
+        right_align_overlay(align_buf, IO.lcd_buf, LCD_BUF_SIZE);
+    }
     IO.flags = LCD_REFRESH_LINE0;
     IO.lcd_refresh_callback();
 
     // Line 1:
-    float2str(Weather.bme280_pressure, floatbuf, LCD_BUF_SIZE, 2);
+    float2str(Weather.bme280_humidity, floatbuf, LCD_BUF_SIZE, 2);
     snprintf(
         IO.lcd_buf,
         LCD_BUF_SIZE,
-        "P:%shPa",
+        "H:%s",
         floatbuf
     );
     float2str(Weather.bme280_altitude, floatbuf, LCD_BUF_SIZE, 2);
@@ -147,21 +173,56 @@ static void lcd_refresh(void) {
     IO.lcd_refresh_callback();
 
     // Line 2:
-    snprintf(
-        IO.lcd_buf,
-        LCD_BUF_SIZE,
-        "eCO2:%dPPM",
-        Weather.eco2_val
-    );
-    float2str(Weather.bme280_altitude, floatbuf, LCD_BUF_SIZE, 2);
-    snprintf(
-        align_buf,
-        ALIGN_BUF_SIZE,
-        "tVOC:%dPPB",
-        Weather.tvoc_val
-    );
-    right_align_overlay(align_buf, IO.lcd_buf, LCD_BUF_SIZE);
+    if(!Weather.status.ccs811_ready) {
+        snprintf(
+            IO.lcd_buf,
+            LCD_BUF_SIZE,
+            "CCS811 fail"
+        );
+    } else {
+        snprintf(
+            IO.lcd_buf,
+            LCD_BUF_SIZE,
+            "eCO2:%dPPM",
+            Weather.eco2_val
+        );
+        float2str(Weather.bme280_altitude, floatbuf, LCD_BUF_SIZE, 2);
+        snprintf(
+            align_buf,
+            ALIGN_BUF_SIZE,
+            "tVOC:%dPPB",
+            Weather.tvoc_val
+        );
+        right_align_overlay(align_buf, IO.lcd_buf, LCD_BUF_SIZE);
+    }
     IO.flags = LCD_REFRESH_LINE2;
+    IO.lcd_refresh_callback();
+
+    // Line3:
+    if(!Weather.status.dht22_ready) {
+        snprintf(
+            IO.lcd_buf,
+            LCD_BUF_SIZE,
+            "DHT22 fail"
+        );
+    } else {
+        float2str(Weather.dht22_temperature, floatbuf, LCD_BUF_SIZE, 2);
+        snprintf(
+            IO.lcd_buf,
+            LCD_BUF_SIZE,
+            "DT:%s",
+            floatbuf
+        );
+        float2str(Weather.dht22_humidity, floatbuf, LCD_BUF_SIZE, 2);
+        snprintf(
+            align_buf,
+            ALIGN_BUF_SIZE,
+            "DH:%s",
+            floatbuf
+        );
+        right_align_overlay(align_buf, IO.lcd_buf, LCD_BUF_SIZE);
+    }
+    IO.flags = LCD_REFRESH_LINE3;
     IO.lcd_refresh_callback();
 }
 

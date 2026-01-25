@@ -61,15 +61,19 @@
 // Ublox GT-U7 GPS module:
 #define GT_U7_RX            5
 #define GT_U7_TX            6
+
+// Weather module:
+#define DHT22_DAT_PIN       4
 ///////////////////////////////////////////////////////////////
 
 // Module enablers:
 // #define ENABLE_RADIO_MODULE
-#define ENABLE_RC_STATION
+//#define ENABLE_RC_STATION
 // #define ENABLE_MICROSD_MODULE
 // #define ENABLE_JOYSTICK_MODULE
 // #define ENABLE_GPS_MODULE
 // #define ENABLE_IMU_MODULE
+#define ENABLE_WEATHER_MODULE
 
 // Interruption:
 #define ENABLE_INT1

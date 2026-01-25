@@ -34,6 +34,10 @@
 #include "imu_module.h"
 #endif
 
+#ifdef ENABLE_WEATHER_MODULE
+#include "weather_module.h"
+#endif
+
 LiquidCrystal_I2C Lcd(LCD_ADDR, LCD_WIDTH, LCD_HEIGHT);
 IRrecv IR_recver(IR_SENSOR_PIN);
 decode_results IR_results;
@@ -140,6 +144,17 @@ void setup(void) {
         imu_module_update,
         imu_module_resume,
         imu_module_exit,
+        Main_menu
+    );
+#endif
+
+#ifdef ENABLE_WEATHER_MODULE
+    register_new_node(
+        "weather",
+        weather_module_init,
+        weather_module_update,
+        weather_module_resume,
+        weather_module_exit,
         Main_menu
     );
 #endif
