@@ -696,14 +696,14 @@ static void render(void) {
             break;
         case SM_MANUAL4:
         case SM_NAVIGATE2:
-            float2str(Station.local_x, floatbuf, LCD_BUF_SIZE, 1);
+            float2str(Station.local_x, floatbuf, LCD_BUF_SIZE, 3);
             snprintf(
                 IO.lcd_buf,
                 LCD_BUF_SIZE,
                 "X:%s",
                 floatbuf
             );
-            float2str(Station.local_y, floatbuf, LCD_BUF_SIZE, 1);
+            float2str(Station.local_y, floatbuf, LCD_BUF_SIZE, 3);
             snprintf(
                 align_buf,
                 ALIGN_BUF_SIZE,

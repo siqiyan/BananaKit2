@@ -42,15 +42,17 @@ int gnss_update(gnss_reader_t *gnss, char c) {
     // Append incoming data into buffer and process if '$' is detected or
     // if the buffer is full.
 
+    int ret_code = 0;
+
     if(gnss == NULL) {
-        return 0;
+        return ret_code;
     }
 
     if(c == '$') {
 
         if(gnss->status.nmea_started) {
             gnss->buf[gnss->buf_count] = '\0';
-            parse_gnss_data_buf(gnss);
+            ret_code = parse_gnss_data_buf(gnss);
         }
 
         gnss->buf_count = 0;
@@ -63,7 +65,7 @@ int gnss_update(gnss_reader_t *gnss, char c) {
 
             if(gnss->status.nmea_started) {
                 gnss->buf[gnss->buf_count] = '\0';
-                parse_gnss_data_buf(gnss);
+                ret_code = parse_gnss_data_buf(gnss);
             }
 
             gnss->buf_count = 0;
@@ -76,7 +78,7 @@ int gnss_update(gnss_reader_t *gnss, char c) {
 
     }
 
-    return 1;
+    return ret_code;
 }
 
 int parse_gnss_data_buf(gnss_reader_t *gnss) {
@@ -107,7 +109,7 @@ int parse_gnss_data_buf(gnss_reader_t *gnss) {
     // }  else if(strncmp(gnss->buf, "$GPGSA", 6) == 0) {
     // }
 
-    return 1;
+    return 0;
 }
 
 static int parse_gprmc_string(gnss_reader_t *gnss) {
