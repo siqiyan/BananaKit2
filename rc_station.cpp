@@ -283,12 +283,12 @@ static void process_status_packet(const vehicle_status_t *frame) {
     Station.cmd_yaw_reply           = frame->cmd_yaw_reply;
     Station.left_pwm                = frame->left_pwm;
     Station.right_pwm               = frame->right_pwm;
-    if(frame->status.left_dir == DIR_FORWARD) {
+    if(frame->status.left_dir) {
         Station.left_pwm_signed     = ((int16_t) frame->left_pwm);
     } else {
         Station.left_pwm_signed     = -((int16_t) frame->left_pwm);
     }
-    if(frame->status.right_dir == DIR_FORWARD) {
+    if(frame->status.right_dir) {
         Station.right_pwm_signed    = ((int16_t) frame->right_pwm);
     } else {
         Station.right_pwm_signed    = -((int16_t) frame->right_pwm);
@@ -806,14 +806,14 @@ static void render(void) {
             right_align_overlay(align_buf, IO.lcd_buf, LCD_BUF_SIZE);
             break;
         case SM_NAVIGATE1:
-            float2str(Station.cmd_yaw_reply, floatbuf, LCD_BUF_SIZE, 1);
+            float2str(Station.cmd_x_reply, floatbuf, LCD_BUF_SIZE, 3);
             snprintf(
                 IO.lcd_buf,
                 LCD_BUF_SIZE,
                 "RPY X:%s",
                 floatbuf
             );
-            float2str(Station.compass_yaw, floatbuf, LCD_BUF_SIZE, 1);
+            float2str(Station.cmd_yaw_reply, floatbuf, LCD_BUF_SIZE, 1);
             snprintf(
                 align_buf,
                 ALIGN_BUF_SIZE,

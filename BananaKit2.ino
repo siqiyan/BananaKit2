@@ -38,6 +38,10 @@
 #include "weather_module.h"
 #endif
 
+#ifdef ENABLE_DC_MOTOR_MODULE
+#include "dc_motor_module.h"
+#endif
+
 LiquidCrystal_I2C Lcd(LCD_ADDR, LCD_WIDTH, LCD_HEIGHT);
 IRrecv IR_recver(IR_SENSOR_PIN);
 decode_results IR_results;
@@ -155,6 +159,17 @@ void setup(void) {
         weather_module_update,
         weather_module_resume,
         weather_module_exit,
+        Main_menu
+    );
+#endif
+
+#ifdef ENABLE_DC_MOTOR_MODULE
+    register_new_node(
+        "dc motor",
+        dc_motor_init,
+        dc_motor_update,
+        dc_motor_resume,
+        dc_motor_exit,
         Main_menu
     );
 #endif

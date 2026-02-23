@@ -64,16 +64,21 @@
 
 // Weather module:
 #define DHT22_DAT_PIN       4
+
+// DC motor module:
+#define DC_MOTOR_EN         5
+#define DC_MOTOR_ADC        A3
 ///////////////////////////////////////////////////////////////
 
 // Module enablers:
 // #define ENABLE_RADIO_MODULE
-//#define ENABLE_RC_STATION
+#define ENABLE_RC_STATION
 // #define ENABLE_MICROSD_MODULE
 // #define ENABLE_JOYSTICK_MODULE
 // #define ENABLE_GPS_MODULE
 // #define ENABLE_IMU_MODULE
-#define ENABLE_WEATHER_MODULE
+//#define ENABLE_WEATHER_MODULE
+//#define ENABLE_DC_MOTOR_MODULE
 
 // Interruption:
 #define ENABLE_INT1
