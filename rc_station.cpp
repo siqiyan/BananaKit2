@@ -83,8 +83,8 @@ void rc_station_init(void) {
     // Init rc station variables:
     memset(&Station, 0, sizeof(rc_station_t));
     Station.status.is_connected         = 0;
-    Station.joy_neutral_pos_x           = 635;
-    Station.joy_neutral_pos_y           = 645;
+    Station.joy_neutral_pos_x           = 498;
+    Station.joy_neutral_pos_y           = 506;
     Station.debug_code                  = 0;
     // Station.sm_state                    = SM_UNCONNECT;
     Station.sm_state = SM_MANUAL1;

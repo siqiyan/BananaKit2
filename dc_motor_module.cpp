@@ -11,8 +11,8 @@
 extern callstack_t Callstack;
 extern bananakit_io_t IO;
 
-#define ADC_R1 10250.0
-#define ADC_R2 46400.0
+#define ADC_R1 (10000.0)
+#define ADC_R2 (10000.0)
 
 static int32_t currTimestamp;
 static int32_t prevTimestamp;
@@ -49,8 +49,7 @@ node_status_t dc_motor_update(void) {
         IO.lcd_refresh_callback();
 
         float2str(
-            //get_adc_voltage(motor_adc, 5.0, ADC_R1, ADC_R2),
-            get_adc_voltage(motor_adc, 5.0, 47000.0, 10000.0),
+            get_adc_voltage(motor_adc, 5.0, ADC_R1, ADC_R2),
             IO.lcd_buf,
             LCD_BUF_SIZE,
             2
