@@ -7,7 +7,7 @@
 #include "bananakit_io.h"
 #include "bananakit_misc.h"
 #include "banana_string.h"
-#include "dc_motor_module.h"
+#include "module/dc_motor_module.h"
 extern callstack_t Callstack;
 extern bananakit_io_t IO;
 

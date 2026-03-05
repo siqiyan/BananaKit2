@@ -71,13 +71,13 @@
 ///////////////////////////////////////////////////////////////
 
 // Module enablers:
-// #define ENABLE_RADIO_MODULE
-#define ENABLE_RC_STATION
-// #define ENABLE_MICROSD_MODULE
-//#define ENABLE_JOYSTICK_MODULE
-// #define ENABLE_GPS_MODULE
-// #define ENABLE_IMU_MODULE
-//#define ENABLE_WEATHER_MODULE
+//#define ENABLE_RADIO_MODULE
+//#define ENABLE_RC_STATION
+//#define ENABLE_MICROSD_MODULE
+#define ENABLE_JOYSTICK_MODULE
+//#define ENABLE_GPS_MODULE
+//#define ENABLE_IMU_MODULE
+#define ENABLE_WEATHER_MODULE
 //#define ENABLE_DC_MOTOR_MODULE
 
 // Interruption:

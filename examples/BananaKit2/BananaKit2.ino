@@ -11,35 +11,35 @@
 #include "bananakit_io.h"
 
 #ifdef ENABLE_RADIO_MODULE
-    #include "radio_module.h"
+#include "module/radio_module.h"
 #endif
 
 #ifdef ENABLE_MICROSD_MODULE
-    #include "microsd_module.h"
+#include "module/microsd_module.h"
 #endif
 
 #ifdef ENABLE_JOYSTICK_MODULE
-#include "joystick_module.h"
+#include "module/joystick_module.h"
 #endif
 
 #ifdef ENABLE_RC_STATION
-#include "rc_station.h"
+#include "module/rc_station.h"
 #endif
 
 #ifdef ENABLE_GPS_MODULE
-#include "gps_module.h"
+#include "module/gps_module.h"
 #endif
 
 #ifdef ENABLE_IMU_MODULE
-#include "imu_module.h"
+#include "module/imu_module.h"
 #endif
 
 #ifdef ENABLE_WEATHER_MODULE
-#include "weather_module.h"
+#include "module/weather_module.h"
 #endif
 
 #ifdef ENABLE_DC_MOTOR_MODULE
-#include "dc_motor_module.h"
+#include "module/dc_motor_module.h"
 #endif
 
 LiquidCrystal_I2C Lcd(LCD_ADDR, LCD_WIDTH, LCD_HEIGHT);

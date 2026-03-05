@@ -8,8 +8,8 @@
 #include "bananakit_io.h"
 #include "banana_string.h"
 #include "bananakit_misc.h"
-#include "imu_module.h"
-#include "imu_reader.h"
+#include "module/imu_module.h"
+#include "lib/imu_reader/imu_reader.h"
 
 #define FLOAT_BUF_SZ 16
 #define MAX_PAGES 1

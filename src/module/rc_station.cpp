@@ -12,8 +12,8 @@
 #include "bananakit_io.h"
 #include "bananakit_misc.h"
 #include "banana_string.h"
-#include "rc_station.h"
-#include "rc_vehicle_common.h"
+#include "module/rc_station.h"
+#include "lib/rc_vehicle/rc_vehicle_common.h"
 
 static void rc_station_interrupt(void);
 static void update_keyboard_inputs(void);

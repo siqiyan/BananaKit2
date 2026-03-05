@@ -10,8 +10,8 @@
 #include "bananakit_io.h"
 #include "banana_string.h"
 #include "bananakit_misc.h"
-#include "gps_module.h"
-#include "gnss_reader.h"
+#include "module/gps_module.h"
+#include "lib/gnss_reader/gnss_reader.h"
 
 static void refresh_gps_info_display(void);
 

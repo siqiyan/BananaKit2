@@ -14,7 +14,7 @@
 #include "bananakit_io.h"
 #include "banana_string.h"
 #include "bananakit_misc.h"
-#include "weather_module.h"
+#include "module/weather_module.h"
 #define SEALEVELPRESSURE_HPA (1013.25)
 #define BME280_ADDR 0x76
 #define CCS811_ADDR 0x5A

@@ -11,7 +11,7 @@
 #include "bananakit_io.h"
 #include "banana_string.h"
 #include "bananakit_misc.h"
-#include "microsd_module.h"
+#include "module/microsd_module.h"
 
 static int sd_pre_check_info(void);
 static void display_sd_info(void);

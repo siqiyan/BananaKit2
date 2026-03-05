@@ -9,10 +9,10 @@
 #include "menu.h"
 #include "bananakit_io.h"
 #include "bananakit_misc.h"
-#include "radio_module.h"
-#include "radio.h"
-#include "signal_process.h"
 #include "banana_string.h"
+#include "module/radio_module.h"
+#include "lib/radio/radio.h"
+#include "lib/radio/signal_process.h"
 
 
 extern callstack_t Callstack;

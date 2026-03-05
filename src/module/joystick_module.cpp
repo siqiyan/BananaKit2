@@ -4,11 +4,11 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <Arduino.h>
-#include "joystick_module.h"
 #include "callstack.h"
 #include "menu.h"
 #include "bananakit_io.h"
 #include "bananakit_misc.h"
+#include "module/joystick_module.h"
 
 extern callstack_t Callstack;
 extern bananakit_io_t IO;
