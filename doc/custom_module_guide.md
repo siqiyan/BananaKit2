@@ -9,6 +9,6 @@ pin access mainly for digital and SPI components.
 Both types of modules are power supplied at 5V and can be connected
 simultaneously to BananaKit2.
 
-![Module Pinout 3x7CM](doc/empty_module_3x7.png)
+![Module Pinout 3x7CM](empty_module_3x7.png)
 
-![Module Pinout 4x6CM](doc/empty_module_4x6.png)
+![Module Pinout 4x6CM](empty_module_4x6.png)
