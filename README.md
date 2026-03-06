@@ -20,6 +20,15 @@ again, no need to write code again.
 
 ![BananaKit2 All Combonents](doc/bananakit2_family.jpg)
 
+## Function Demo
+
+The following images demonstrate the running states of BananaKit2 by activating
+different modules (Weather, GPS, RC Station and SD Card) without the need to
+re-wire the PCB or change source code. This feature helps to accelerate prototyping
+stage on IoT projects.
+
+![BananaKit2 Function Demo](doc/bananakit2_demo.png)
+
 ## Get Started
 
 Make sure Arduino IDE is installed on your local machine. Clone this repository
@@ -53,17 +62,9 @@ for BananaKit2.
 ### Build Custom Module
 
 BananaKit2 supports two types of custom module based on the common prototype PCB
-dimensions: 3x7cm and 4x6cm. You can purchase these PCBs online. Each module
-requires two 8Pin male connectors. Checkout the [Removable Module
-Specs](doc/custom_module_specs.md) for
-details.
-
-The 3x7cm module has I2C, UART, D3-D6, A1-A5 and A7 pin access to the Arduino
-Nano, suitable for analog sensors. The 4x6cm module has SPI, D3-D6, D8 and D9
-pin access mainly for digital and SPI components.
-
-Both types of modules are power supplied at 5V and can be connected
-simultaneously to BananaKit2.
+dimensions: 3x7cm and 4x6cm. You can purchase these PCBs online.
+Checkout the [Custom Module Guide](doc/custom_module_guide.md) for
+details on design new custom modules.
 
 
 ### Develop Module Software
