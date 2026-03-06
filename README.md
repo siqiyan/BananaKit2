@@ -1,58 +1,102 @@
 # BananaKit2
 
-🍌 BananaKit2 is a custom designed MPU development platform based on Arduino
-Nano. The goal of this project is to bridge the gap between ideas and
-prototyping to accelerate development process and make project more organized for reuse.
+🍌 **BananaKit2** is a custom designed MPU development platform based on Arduino
+Nano.
 
-In traditional Arduino/MCU project prototyping, you build cuicuit on breadboard and
-develop your firmware, and when you finish the project you discard your cuicuit and leave your
-code forgotten.
+The goal of this project is to bridge the gap between **ideas and rapid prototyping**,
+making development faster and keeping hardware/software modules organized for reuse.
 
-Here, in prototyping stage you first design cuicuit blueprint, inspect the blueprint, then use
-soldering iron to build the prototyping PCB and develop software module
-that are compatable with BananaKit2 and *keep them permanently* in one place before you
-switch to the next project.
+In traditional Arduino/MCU prototyping, circuits are usually built on a breadboard
+while firmware is developed in parallel. Once the project is finished, the circuit
+is often dismantled and the code is forgotten.
 
-Later when you need the same function in previous work, just plugin the old
-PCB module designed previously on the BananaKit2 and turn on its software
-module, everything still works in the same way, no need to wire breadboard
-again, no need to write code again.
+BananaKit2 proposes a different workflow:
+
+1. Design a circuit blueprint
+
+2. Build the module on a small prototype PCB
+
+3. Develop a reusable software module
+
+4. Store both hardware and software modules permanently in one place
+
+When you start a new project, you can simply plug in previously built modules and
+enable their software components.
+
+No rewiring.
+
+No rewriting code.
 
 ![BananaKit2 All Combonents](doc/bananakit2_family.jpg)
 
 ## Function Demo
 
-To see how it works, the following images demonstrate BananaKit2 running in
-different modules  without the need to re-wire the PCB or change source code.
-Simply plugin the hardware modules you need, and use IR remote controller to
-switch the function and start running.
+To see how it works, the following examples demonstrate BananaKit2 running
+different modules without rewiring hardware or changing firmware.
 
-Plug weather module, start weather program;
+Simply plug in the hardware modules and use the IR remote controller to switch
+between functions.
 
-Plug GPS module, start GPS program;
+Plug Weather Module, start weather program;
 
-Plug Joystick module and NRF24 module, start to control RC car;
+Plug GPS Module, start GPS program;
 
-Plug SD Card module, start to read data from SD card.
+Plug Joystick Module and NRF24 Module, control an RC car;
+
+Plug SD Card Module, read data from an SD card.
 
 ![BananaKit2 Function Demo](doc/bananakit2_demo.png)
 
 ## Get Started
 
-Make sure Arduino IDE is installed on your local machine. Clone this repository
-into the library directory (usually in `~/Arduino/libraries/` for Linux and 
-`Your Home Directory\Documents\Arduino\libraries\` for Windows).
+1. Install the Arduino IDE on your system.
 
-To turn on/off software modules, go to `src/bananakit.h` and comment/uncomment
-the macros, i.e. uncomment `#define ENABLE_JOYSTICK_MODULE` will enable the
-joystick module.
+2. Clone this repository into your Arduino libraries directory:
 
-Then, open `examples/BananaKit2/BananaKit2.ino` in Arduino IDE, build and
-upload the firmware into BananaKit2.
+Linux
 
-Turn on BananaKit2, the LCD screen should display the Main Menu. Use `2` and `5`
-buttons on the IR controller to select the software module name, and use `6`
-button to start running the module. Use `4` button to go back to the Main Menu.
+```
+~/Arduino/libraries/
+```
+
+Windows
+
+```
+Documents\Arduino\libraries\
+```
+
+3. Enable or disable modules in:
+
+```
+src/bananakit.h
+```
+
+Example:
+
+```
+#define ENABLE_JOYSTICK_MODULE
+```
+
+4. Open the example project:
+
+```
+examples/BananaKit2/BananaKit2.ino
+```
+
+5. Build and upload the firmware to BananaKit2.
+
+### Using the Interface
+
+After powering on BananaKit2, the LCD will display the **Main Menu**.
+
+Use the IR remote buttons:
+
+| Button | Function            |
+| ------ | ------------------- |
+| 2      | Move up             |
+| 5      | Move down           |
+| 6      | Start module        |
+| 4      | Return to main menu |
 
 ## Build BananaKit2 Hardware
 
@@ -68,51 +112,63 @@ After purchase all required components, follow the
 
 ### Build Custom Module
 
-BananaKit2 supports two types of custom module based on the common prototype PCB
-dimensions: 3x7cm and 4x6cm. You can purchase these PCBs online.
+BananaKit2 supports two types of standard prototype PCB sizes:
 
-Each module requires two 8Pin male connectors.
+| Module Size  | Use Case                        |
+| ------------ | ------------------------------- |
+| **3 × 7 cm** | Analog sensors and I2C devices  |
+| **4 × 6 cm** | Digital modules and SPI devices |
 
-The 3x7cm module has I2C, UART, D3-D6, A1-A5 and A7 pin access to the Arduino
-Nano, suitable for analog sensors. The 4x6cm module has SPI, D3-D6, D8 and D9
-pin access mainly for digital and SPI components.
+Each module uses **two 8-pin male connectors**.
 
-Both types of modules are power supplied at 5V and can be connected
-simultaneously to BananaKit2.
+### 3×7cm Module Pins
+
+* I2C
+* UART
+* D3–D6
+* A1–A5
+* A7
+
+### 4×6cm Module Pins
+
+* SPI
+* D3–D6
+* D8
+* D9
+
+Both module types receive **5V power** and can be used simultaneously.
 
 
 ### Develop Module Software
 
+To create a BananaKit2-compatible software module:
+
 To develop custom software module compatable with BananaKit2, you need to change
 the following parts in the repository:
 
-1. Register the module IO PIN numbers to `src/bananakit.h`;
+1. Edit `src/bananakit.h` to register IO pins:
 
-Example:
 ```c
 #define NRF24_CE_PIN        10
 #define NRF24_CSN_PIN       9
 #define NRF24_IRQ_PIN       3
 ```
 
-2. Add a macro enabler to `src/bananakit.h`;
+2. Edit `src/bananakit.h` to add a module enable macro:
 
-Example:
 ```c
 #define ENABLE_JOYSTICK_MODULE
 ```
 
-3. Add macros to include your module header file to
-   `examples/BananaKit2/BananaKit2.ino`;
+3. Include the module in the example firmware `examples/BananaKit2/BananaKit2.ino`:
 
-Example:
 ```c
 #ifdef ENABLE_RADIO_MODULE
 #include "module/radio_module.h"
 #endif
 ```
 
-4. Add macros to register your module interface to the Main Menu;
+4. Register the module in the main menu in `examples/BananaKit2/BananaKit2.ino`:
 
 Example:
 ```c
@@ -128,12 +184,16 @@ register_new_node(
 #endif
 ```
 
-5. Put your source code interface into `src/module/`, and put your custom
-   libraries into `src/lib/`
+5. Add your source code:
 
-Note:
+| Directory     | Purpose               |
+| ------------- | --------------------- |
+| `src/module/` | Module implementation |
+| `src/lib/`    | Custom libraries      |
 
-Due to the limitation of ATMega328p MCU, you may encounter oversized firmware
+### Firmware Size Limitation
+
+The **ATmega328P** has limited flash memory, you may encounter oversized firmware
 that failed to upload if you turn on too many modules at the same time.
 Try to reduce your firmware size by turning off uncessary/unused modules.
 
@@ -164,7 +224,7 @@ Try to reduce your firmware size by turning off uncessary/unused modules.
 
 ## Dependencies & Credits
 
-Here is a list of open source repositories used by this project:
+This project uses the following open-source libraries:
 
 [LiquidCrystal\_I2C](https://github.com/marcoschwartz/LiquidCrystal_I2C)
 
@@ -186,3 +246,5 @@ Library](https://github.com/sparkfun/SparkFun_CCS811_Arduino_Library)
 [Thin](https://github.com/siqiyan/thin)
 
 [CRC](https://github.com/RobTillaart/CRC)
+
+Please refer to their respective repositories for documentation and licenses.
