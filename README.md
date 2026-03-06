@@ -62,7 +62,7 @@ for youself if you are interested and if you know how to use soldering iron.
 Checkout [Hardware List](doc/hardware_list.md) for detailed purchase list.
 
 After purchase all required components, follow the
-[Assembly Instruction](doc/assumbly_instruction.md) to build your BananaKit2.
+[Assembly Instruction](doc/assembly_instruction.md) to build your BananaKit2.
 
 ## Advanced
 
