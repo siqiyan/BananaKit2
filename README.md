@@ -1,8 +1,8 @@
 # BananaKit2
 
 🍌 BananaKit2 is a custom designed MPU development platform based on Arduino
-Nano. The goal of this project is to bridge the gap between ideas and fast
-prototyping to accelerate development process and making project more organized.
+Nano. The goal of this project is to bridge the gap between ideas and
+prototyping to accelerate development process and make project more organized for reuse.
 
 In traditional Arduino/MCU project prototyping, you build cuicuit on breadboard and
 develop your firmware, and when you finish the project you discard your cuicuit and leave your
@@ -10,7 +10,7 @@ code forgotten.
 
 Here, in prototyping stage you first design cuicuit blueprint, inspect the blueprint, then use
 soldering iron to build the prototyping PCB and develop software module
-that are compatable with BananaKit2 and *keep them permanently* before you
+that are compatable with BananaKit2 and *keep them permanently* in one place before you
 switch to the next project.
 
 Later when you need the same function in previous work, just plugin the old
@@ -22,10 +22,18 @@ again, no need to write code again.
 
 ## Function Demo
 
-The following images demonstrate the running states of BananaKit2 by activating
-different modules (Weather, GPS, RC Station and SD Card) without the need to
-re-wire the PCB or change source code. This feature helps to accelerate prototyping
-stage on IoT projects.
+To see how it works, the following images demonstrate BananaKit2 running in
+different modules  without the need to re-wire the PCB or change source code.
+Simply plugin the hardware modules you need, and use IR remote controller to
+switch the function and start running.
+
+Plug weather module, start weather program;
+
+Plug GPS module, start GPS program;
+
+Plug Joystick module and NRF24 module, start to control RC car;
+
+Plug SD Card module, start to read data from SD card.
 
 ![BananaKit2 Function Demo](doc/bananakit2_demo.png)
 
@@ -48,14 +56,13 @@ button to start running the module. Use `4` button to go back to the Main Menu.
 
 ## Build BananaKit2 Hardware
 
+Unfortunately, you cannot buy BananaKit2 at this time and you have to build one
+for youself if you are interested and if you know how to use soldering iron.
+
 Checkout [Hardware List](doc/hardware_list.md) for detailed purchase list.
 
-After you get all components, build the [Mainboard](doc/mainboard_specs.md) 
-and the [Power Supply Module](doc/psm_specs.md) using Soldering Iron, use a multimeter to
-measure the output voltage on LM2569 and adjust to 5V before powering on the system.
-Then wire the system together according to the [Diagram](doc/system_diagram.md).
-You can drill holes on an acrylic sheet as a base or 3D print a case
-for BananaKit2.
+After purchase all required components, follow the
+[Assembly Instruction](doc/assumbly_instruction.md) to build your BananaKit2.
 
 ## Advanced
 
@@ -63,8 +70,15 @@ for BananaKit2.
 
 BananaKit2 supports two types of custom module based on the common prototype PCB
 dimensions: 3x7cm and 4x6cm. You can purchase these PCBs online.
-Checkout the [Custom Module Guide](doc/custom_module_guide.md) for
-details on design new custom modules.
+
+Each module requires two 8Pin male connectors.
+
+The 3x7cm module has I2C, UART, D3-D6, A1-A5 and A7 pin access to the Arduino
+Nano, suitable for analog sensors. The 4x6cm module has SPI, D3-D6, D8 and D9
+pin access mainly for digital and SPI components.
+
+Both types of modules are power supplied at 5V and can be connected
+simultaneously to BananaKit2.
 
 
 ### Develop Module Software

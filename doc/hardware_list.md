@@ -3,8 +3,10 @@
 | Component Name | Qty | Note |
 |---|---|---|
 | Arduino Nano                  | 1 | |
-| 2004 LCD with I2C Interface   | 1 | |
+| 2004A LCD                     | 1 | |
+| PCF8574T I2C Adapter          | 1 | |
 | 12400 battery                 | 2 | |
+| AA battery case x2            | 1 | |
 | Battery Charger               | 1 | Optional |
 | LM2569 Voltage Regulator      | 1 | |
 | Prototyping PCB 7x9cm         | 1 | |
