@@ -124,17 +124,17 @@ Try to reduce your firmware size by turning off uncessary/unused modules.
 
 ### Pinout Reference
 
-[BananaKit2 Mainboard Pinout]()
+[BananaKit2 Mainboard Pinout](doc/mainboard_blueprint.png)
 
-[Module Pinout 3x7CM]()
+[Module Pinout 3x7CM](doc/empty_module_3x7.png)
 
-[Module Pinout 4x6CM]()
+[Module Pinout 4x6CM](doc/empty_module_4x6.png)
 
 ### Supported Module Blueprints
 
-[Weather Module Blueprint]()
+[Weather Module Blueprint](doc/weather_module_blueprint.png)
 
-[GPS IMU Module Blueprint]()
+[GPS IMU Module Blueprint](doc/gps_imu_blueprint.png)
 
 [Radio Module Blueprint]()
 
@@ -142,7 +142,7 @@ Try to reduce your firmware size by turning off uncessary/unused modules.
 
 [Joystick Module Blueprint]()
 
-[NRF24 Module Blueprint]()
+[NRF24 Module Blueprint](doc/nrf24_module_blueprint.png)
 
 [MicroSD Module Blueprint]()
 
@@ -152,13 +152,22 @@ Try to reduce your firmware size by turning off uncessary/unused modules.
 Here is a list of open source repositories used by this project:
 
 [LiquidCrystal\_I2C](https://github.com/marcoschwartz/LiquidCrystal_I2C)
+
 [Adafruit BME280 Library](https://github.com/adafruit/Adafruit_BME280_Library)
+
 [Adafruit BNO055](https://github.com/adafruit/Adafruit_BNO055)
+
 [IRremote](https://github.com/z3t0/Arduino-IRremote)
+
 [MPU6050](https://github.com/electroniccats/mpu6050)
+
 [RF24](https://nRF24.github.io/RF24/)
+
 [SD](http://www.arduino.cc/en/Reference/SD)
+
 [SparkFun CCS811 Arduino
 Library](https://github.com/sparkfun/SparkFun_CCS811_Arduino_Library)
+
 [Thin](https://github.com/siqiyan/thin)
+
 [CRC](https://github.com/RobTillaart/CRC)
