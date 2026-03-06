@@ -100,8 +100,8 @@ Use the IR remote buttons:
 
 ## Build BananaKit2 Hardware
 
-Unfortunately, you cannot buy BananaKit2 at this time and you have to build one
-for youself if you are interested and if you know how to use soldering iron.
+Unfortunately, BananaKit2 is currently **not commercially available**. If you
+want to use it, you will need to build one yourself.
 
 Checkout [Hardware List](doc/hardware_list.md) for detailed purchase list.
 
@@ -143,9 +143,6 @@ Both module types receive **5V power** and can be used simultaneously.
 
 To create a BananaKit2-compatible software module:
 
-To develop custom software module compatable with BananaKit2, you need to change
-the following parts in the repository:
-
 1. Edit `src/bananakit.h` to register IO pins:
 
 ```c
@@ -170,7 +167,6 @@ the following parts in the repository:
 
 4. Register the module in the main menu in `examples/BananaKit2/BananaKit2.ino`:
 
-Example:
 ```c
 #ifdef ENABLE_MICROSD_MODULE
 register_new_node(
@@ -194,8 +190,8 @@ register_new_node(
 ### Firmware Size Limitation
 
 The **ATmega328P** has limited flash memory, you may encounter oversized firmware
-that failed to upload if you turn on too many modules at the same time.
-Try to reduce your firmware size by turning off uncessary/unused modules.
+that failed to upload if too many modules were turn on at the same time.
+Try to reduce firmware size by turning off uncessary/unused modules.
 
 ### Pinout Reference
 
