@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 
-#include "banana_string.h"
+#include "lib/bananakit/banana_string.h"
 #include "gnss_reader.h"
 
 #define FIELD_BUF_SZ 16

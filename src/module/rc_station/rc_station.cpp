@@ -7,13 +7,13 @@
 #include <math.h>
 #include <Arduino.h>
 #include <util/atomic.h>
-#include "callstack.h"
-#include "menu.h"
-#include "bananakit_io.h"
-#include "bananakit_misc.h"
-#include "banana_string.h"
-#include "module/rc_station.h"
-#include "lib/rc_vehicle/rc_vehicle_common.h"
+#include "lib/bananakit/callstack.h"
+#include "lib/bananakit/menu.h"
+#include "lib/bananakit/bananakit_io.h"
+#include "lib/bananakit/bananakit_misc.h"
+#include "lib/bananakit/banana_string.h"
+#include "rc_station.h"
+#include "rc_vehicle_common.h"
 
 static void rc_station_interrupt(void);
 static void update_keyboard_inputs(void);

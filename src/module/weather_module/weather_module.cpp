@@ -9,12 +9,12 @@
 #include <Adafruit_BME280.h>
 #include <SparkFunCCS811.h>
 #include <DHT.h>
-#include "callstack.h"
-#include "menu.h"
-#include "bananakit_io.h"
-#include "banana_string.h"
-#include "bananakit_misc.h"
-#include "module/weather_module.h"
+#include "lib/bananakit/callstack.h"
+#include "lib/bananakit/menu.h"
+#include "lib/bananakit/bananakit_io.h"
+#include "lib/bananakit/banana_string.h"
+#include "lib/bananakit/bananakit_misc.h"
+#include "weather_module.h"
 #define SEALEVELPRESSURE_HPA (1013.25)
 #define BME280_ADDR 0x76
 #define CCS811_ADDR 0x5A

@@ -6,12 +6,12 @@
 #include <Arduino.h>
 #include <SD.h>
 #include <SPI.h>
-#include "callstack.h"
-#include "menu.h"
-#include "bananakit_io.h"
-#include "banana_string.h"
-#include "bananakit_misc.h"
-#include "module/microsd_module.h"
+#include "lib/bananakit/callstack.h"
+#include "lib/bananakit/menu.h"
+#include "lib/bananakit/bananakit_io.h"
+#include "lib/bananakit/banana_string.h"
+#include "lib/bananakit/bananakit_misc.h"
+#include "microsd_module.h"
 
 static int sd_pre_check_info(void);
 static void display_sd_info(void);

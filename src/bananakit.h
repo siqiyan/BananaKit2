@@ -74,13 +74,46 @@
 //#define ENABLE_RADIO_MODULE
 //#define ENABLE_RC_STATION
 //#define ENABLE_MICROSD_MODULE
-#define ENABLE_JOYSTICK_MODULE
+//#define ENABLE_JOYSTICK_MODULE
 //#define ENABLE_GPS_MODULE
 //#define ENABLE_IMU_MODULE
-#define ENABLE_WEATHER_MODULE
-//#define ENABLE_DC_MOTOR_MODULE
+//#define ENABLE_WEATHER_MODULE
+#define ENABLE_DC_MOTOR_MODULE
 
 // Interruption:
 #define ENABLE_INT1
+
+// Include module header files:
+#ifdef ENABLE_RADIO_MODULE
+#include "module/radio_module/radio_module.h"
+#endif
+
+#ifdef ENABLE_MICROSD_MODULE
+#include "module/microsd_module/microsd_module.h"
+#endif
+
+#ifdef ENABLE_JOYSTICK_MODULE
+#include "module/joystick_module/joystick_module.h"
+#endif
+
+#ifdef ENABLE_RC_STATION
+#include "module/rc_station/rc_station.h"
+#endif
+
+#ifdef ENABLE_GPS_MODULE
+#include "module/gps_module/gps_module.h"
+#endif
+
+#ifdef ENABLE_IMU_MODULE
+#include "module/imu_module/imu_module.h"
+#endif
+
+#ifdef ENABLE_WEATHER_MODULE
+#include "module/weather_module/weather_module.h"
+#endif
+
+#ifdef ENABLE_DC_MOTOR_MODULE
+#include "module/dc_motor_module/dc_motor_module.h"
+#endif
 
 #endif

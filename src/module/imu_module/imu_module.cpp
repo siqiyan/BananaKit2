@@ -3,13 +3,13 @@
 
 #include <string.h>
 #include <stdlib.h>
-#include "callstack.h"
-#include "menu.h"
-#include "bananakit_io.h"
-#include "banana_string.h"
-#include "bananakit_misc.h"
-#include "module/imu_module.h"
+#include "lib/bananakit/callstack.h"
+#include "lib/bananakit/menu.h"
+#include "lib/bananakit/bananakit_io.h"
+#include "lib/bananakit/banana_string.h"
+#include "lib/bananakit/bananakit_misc.h"
 #include "lib/imu_reader/imu_reader.h"
+#include "imu_module.h"
 
 #define FLOAT_BUF_SZ 16
 #define MAX_PAGES 1

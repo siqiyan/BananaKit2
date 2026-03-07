@@ -2,12 +2,12 @@
 #ifdef ENABLE_DC_MOTOR_MODULE
 
 #include <Arduino.h>
-#include "callstack.h"
-#include "menu.h"
-#include "bananakit_io.h"
-#include "bananakit_misc.h"
-#include "banana_string.h"
-#include "module/dc_motor_module.h"
+#include "lib/bananakit/callstack.h"
+#include "lib/bananakit/menu.h"
+#include "lib/bananakit/bananakit_io.h"
+#include "lib/bananakit/bananakit_misc.h"
+#include "lib/bananakit/banana_string.h"
+#include "dc_motor_module.h"
 extern callstack_t Callstack;
 extern bananakit_io_t IO;
 

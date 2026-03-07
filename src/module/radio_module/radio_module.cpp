@@ -5,14 +5,14 @@
 #include <fs_thin.h>
 #include <Arduino.h>
 #include <EEPROM.h>
-#include "callstack.h"
-#include "menu.h"
-#include "bananakit_io.h"
-#include "bananakit_misc.h"
-#include "banana_string.h"
-#include "module/radio_module.h"
-#include "lib/radio/radio.h"
-#include "lib/radio/signal_process.h"
+#include "lib/bananakit/callstack.h"
+#include "lib/bananakit/menu.h"
+#include "lib/bananakit/bananakit_io.h"
+#include "lib/bananakit/bananakit_misc.h"
+#include "lib/bananakit/banana_string.h"
+#include "radio_module.h"
+#include "radio.h"
+#include "signal_process.h"
 
 
 extern callstack_t Callstack;

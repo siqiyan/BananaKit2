@@ -5,42 +5,10 @@
 #include <IRremote.h>
 
 #include "bananakit.h"
-#include "callstack.h"
-#include "menu.h"
-#include "bananakit_misc.h"
-#include "bananakit_io.h"
-
-#ifdef ENABLE_RADIO_MODULE
-#include "module/radio_module.h"
-#endif
-
-#ifdef ENABLE_MICROSD_MODULE
-#include "module/microsd_module.h"
-#endif
-
-#ifdef ENABLE_JOYSTICK_MODULE
-#include "module/joystick_module.h"
-#endif
-
-#ifdef ENABLE_RC_STATION
-#include "module/rc_station.h"
-#endif
-
-#ifdef ENABLE_GPS_MODULE
-#include "module/gps_module.h"
-#endif
-
-#ifdef ENABLE_IMU_MODULE
-#include "module/imu_module.h"
-#endif
-
-#ifdef ENABLE_WEATHER_MODULE
-#include "module/weather_module.h"
-#endif
-
-#ifdef ENABLE_DC_MOTOR_MODULE
-#include "module/dc_motor_module.h"
-#endif
+#include "lib/bananakit/callstack.h"
+#include "lib/bananakit/menu.h"
+#include "lib/bananakit/bananakit_misc.h"
+#include "lib/bananakit/bananakit_io.h"
 
 LiquidCrystal_I2C Lcd(LCD_ADDR, LCD_WIDTH, LCD_HEIGHT);
 IRrecv IR_recver(IR_SENSOR_PIN);

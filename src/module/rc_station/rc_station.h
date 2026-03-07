@@ -6,8 +6,8 @@
 #include <nRF24L01.h>
 #include <RF24.h>
 #include <CRC.h>
-
-#include "lib/rc_vehicle/rc_vehicle_common.h"
+#include "lib/bananakit/callstack.h"
+#include "rc_vehicle_common.h"
 #include "lib/gnss_reader/gnss_reader.h"
 
 // #define UART_SPEED_BPS 115200
