@@ -143,7 +143,7 @@ Both module types receive **5V power** and can be used simultaneously.
 
 To create a BananaKit2-compatible software module:
 
-1. Edit `src/bananakit.h` to register IO pins:
+1. Edit `src/bananakit.h` to register IO pins (optional):
 
 ```c
 #define NRF24_CE_PIN        10
@@ -157,7 +157,7 @@ To create a BananaKit2-compatible software module:
 #define ENABLE_JOYSTICK_MODULE
 ```
 
-3. Include the module in the example firmware `examples/BananaKit2/BananaKit2.ino`:
+3. Include the module header in `src/bananakit.h`:
 
 ```c
 #ifdef ENABLE_RADIO_MODULE
@@ -200,22 +200,6 @@ Try to reduce firmware size by turning off uncessary/unused modules.
 [Module Pinout 3x7CM](doc/empty_module_3x7.png)
 
 [Module Pinout 4x6CM](doc/empty_module_4x6.png)
-
-### Supported Module Blueprints
-
-[Weather Module Blueprint](doc/weather_module_blueprint.png)
-
-[GPS IMU Module Blueprint](doc/gps_imu_blueprint.png)
-
-[Radio Module Blueprint]()
-
-[DC Motor Module Blueprint]()
-
-[Joystick Module Blueprint]()
-
-[NRF24 Module Blueprint](doc/nrf24_module_blueprint.png)
-
-[MicroSD Module Blueprint]()
 
 
 ## Dependencies & Credits
