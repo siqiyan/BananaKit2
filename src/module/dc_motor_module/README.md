@@ -10,7 +10,8 @@ The motor speed is controled by PWM using the Arduino analogWrite
 function.
 
 To use the module, plug in the DC Motor Module into the Right slot
-of BananaKit2.
+of BananaKit2. Use two jumper cables to supply 7.4v unregulated power
+from the Power Supply Module to the DC Motor Module.
 
 Turn on `#define ENABLE_DC_MOTOR_MODULE` in `src/bananakit.h`, re-compile
 the firmware in `examples/BananaKit2/BananaKit2.ino` and upload the
